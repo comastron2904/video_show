@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>관리자 · Online Premiere</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <link rel="stylesheet" href="/css/admin.css" />
+  <script src="/api/config"></script>
+</head>
+<body class="admin">
+  <header class="admin-top">
+    <div>
+      <p class="event-kicker">ADMIN</p>
+      <h1>시사회 관리</h1>
+    </div>
+    <nav>
+      <a class="btn btn-ghost btn-sm" href="/" target="_blank" rel="noopener">시사회장 보기 ↗</a>
+      <button id="logoutBtn" class="btn btn-ghost btn-sm" type="button" hidden>로그아웃</button>
+    </nav>
+  </header>
+
+  <div id="notice" class="notice" hidden></div>
+
+  <!-- 로그인 -->
+  <section id="loginView" class="panel narrow" hidden>
+    <h2>관리자 로그인</h2>
+    <p class="muted">Supabase에 등록한 관리자 계정으로 로그인하세요.</p>
+    <form id="loginForm" class="stack">
+      <label>이메일<input id="loginEmail" type="email" required autocomplete="username" /></label>
+      <label>비밀번호<input id="loginPassword" type="password" required autocomplete="current-password" /></label>
+      <button class="btn btn-gold" type="submit">로그인</button>
+      <p id="loginError" class="error" hidden></p>
+    </form>
+  </section>
+
+  <!-- 관리자 화면 -->
+  <main id="adminView" hidden>
+    <section class="panel">
+      <div class="panel-head"><h2>행사 정보</h2></div>
+      <form id="settingsForm" class="grid-2">
+        <label>행사 제목 <small>(로비 간판에 표시)</small><input id="setTitle" maxlength="40" required /></label>
+        <label>부제<input id="setSubtitle" maxlength="80" /></label>
+        <div class="form-actions span-2"><button class="btn btn-gold btn-sm" type="submit">저장</button></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>상영작 <span id="filmCount" class="count"></span></h2>
+        <button id="newFilmBtn" class="btn btn-gold btn-sm" type="button">+ 상영작 추가</button>
+      </div>
+      <ul id="filmList" class="film-list"></ul>
+      <p id="emptyList" class="muted empty" hidden>아직 등록된 상영작이 없어요. ‘상영작 추가’로 시작하세요.</p>
+    </section>
+  </main>
+
+  <!-- 상영작 편집 -->
+  <div id="editor" class="modal" hidden>
+    <div class="modal-card editor-card" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+      <div class="panel-head">
+        <h2 id="editorTitle">상영작 추가</h2>
+        <button id="closeEditor" class="icon-btn" type="button" aria-label="닫기">✕</button>
+      </div>
+      <form id="filmForm" class="grid-2">
+        <label class="span-2">제목 *<input id="fTitle" maxlength="60" required /></label>
+        <label>감독<input id="fDirector" maxlength="40" /></label>
+        <label>러닝타임<input id="fRuntime" maxlength="20" placeholder="예: 12분" /></label>
+        <label class="span-2">소개<textarea id="fDesc" rows="3" maxlength="400"></textarea></label>
+        <label class="span-2">구글 드라이브 링크 *
+          <input id="fUrl" required placeholder="https://drive.google.com/file/d/…/view?usp=sharing" />
+        </label>
+        <div id="urlStatus" class="url-status span-2"></div>
+        <div class="span-2 preview-wrap" id="previewWrap" hidden>
+          <div class="player-frame small" id="previewFrame"></div>
+        </div>
+        <div class="span-2">
+          <span class="label">팜플렛 색상</span>
+          <div class="swatches" id="swatches"></div>
+        </div>
+        <label class="check span-2"><input id="fVisible" type="checkbox" checked /> 시사회장에 공개</label>
+        <div class="form-actions span-2">
+          <button id="previewBtn" class="btn btn-ghost btn-sm" type="button">재생 미리보기</button>
+          <button class="btn btn-gold btn-sm" type="submit">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="/js/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,444 @@
+// 절차적(코드로 그리는) 텍스처 모음 - 이미지 파일 없이 재질 질감을 만듭니다.
+import * as THREE from 'three';
+
+export const FONT = '"Pretendard Variable", Pretendard, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+
+function rand(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+let maxAniso = 8;
+export function setMaxAnisotropy(v) { maxAniso = Math.min(8, v || 1); }
+
+export function canvasTexture(w, h, draw, { repeat = null, srgb = true } = {}) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  draw(ctx, w, h);
+  const t = new THREE.CanvasTexture(c);
+  if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = maxAniso;
+  if (repeat) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(repeat[0], repeat[1]);
+  }
+  return t;
+}
+
+function hexToRgb(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  const n = m ? parseInt(m[1], 16) : 0xc0392b;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+export function shadeHex(hex, amt) {
+  const [r, g, b] = hexToRgb(hex);
+  const f = (v) => Math.max(0, Math.min(255, Math.round(v + 255 * amt)));
+  return `rgb(${f(r)},${f(g)},${f(b)})`;
+}
+
+function grain(ctx, w, h, amount, r) {
+  for (let i = 0; i < amount; i++) {
+    ctx.fillStyle = r() > 0.5 ? `rgba(255,255,255,${r() * 0.05})` : `rgba(0,0,0,${r() * 0.07})`;
+    ctx.fillRect(r() * w, r() * h, 1.5, 1.5);
+  }
+}
+
+// 대리석 체크 바닥 (2x2 타일 = 텍스처 1장)
+export function marbleTexture() {
+  return canvasTexture(1024, 1024, (ctx, w) => {
+    const r = rand(11);
+    const half = w / 2;
+    for (let i = 0; i < 2; i++) {
+      for (let j = 0; j < 2; j++) {
+        const light = (i + j) % 2 === 0;
+        const x = i * half, y = j * half;
+        const g = ctx.createLinearGradient(x, y, x + half, y + half);
+        if (light) { g.addColorStop(0, '#f5eee3'); g.addColorStop(1, '#e8ddcc'); }
+        else { g.addColorStop(0, '#3a2b2f'); g.addColorStop(1, '#2a1f24'); }
+        ctx.fillStyle = g;
+        ctx.fillRect(x, y, half, half);
+        ctx.save();
+        ctx.beginPath(); ctx.rect(x, y, half, half); ctx.clip();
+        for (let v = 0; v < 9; v++) {
+          ctx.strokeStyle = light ? `rgba(140,125,110,${0.07 + r() * 0.13})` : `rgba(210,180,150,${0.05 + r() * 0.1})`;
+          ctx.lineWidth = 0.5 + r() * 2.4;
+          ctx.beginPath();
+          let px = x + r() * half, py = y - 30;
+          ctx.moveTo(px, py);
+          for (let s = 0; s < 6; s++) {
+            const nx = px + (r() - 0.35) * 140, ny = py + half / 5 + r() * 40;
+            ctx.quadraticCurveTo(px + (r() - 0.5) * 90, (py + ny) / 2, nx, ny);
+            px = nx; py = ny;
+          }
+          ctx.stroke();
+        }
+        grain(ctx, half, half, 0, r);
+        for (let s = 0; s < 1400; s++) {
+          ctx.fillStyle = light ? `rgba(0,0,0,${r() * 0.03})` : `rgba(255,255,255,${r() * 0.03})`;
+          ctx.fillRect(x + r() * half, y + r() * half, 1.5, 1.5);
+        }
+        ctx.restore();
+        ctx.strokeStyle = 'rgba(70,55,40,0.55)';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 1.5, y + 1.5, half - 3, half - 3);
+      }
+    }
+  });
+}
+
+// 레드카펫 (벨벳 결)
+export function carpetTexture() {
+  return canvasTexture(256, 256, (ctx, w, h) => {
+    const r = rand(5);
+    ctx.fillStyle = '#8f1424';
+    ctx.fillRect(0, 0, w, h);
+    for (let i = 0; i < 5000; i++) {
+      const v = r();
+      ctx.fillStyle = v > 0.5 ? `rgba(255,80,90,${r() * 0.06})` : `rgba(30,0,5,${r() * 0.12})`;
+      ctx.fillRect(r() * w, r() * h, 1, 2);
+    }
+  });
+}
+
+// 벽지 (다마스크 패턴)
+export function wallpaperTexture() {
+  return canvasTexture(512, 512, (ctx, w, h) => {
+    const r = rand(3);
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#3d1a2e'); g.addColorStop(1, '#351627');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    // 세로 줄무늬
+    for (let x = 0; x < w; x += 64) {
+      ctx.fillStyle = 'rgba(255,255,255,0.025)';
+      ctx.fillRect(x, 0, 32, h);
+    }
+    // 다마스크 모티프
+    const motif = (cx, cy, s) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.strokeStyle = 'rgba(214,170,90,0.16)';
+      ctx.fillStyle = 'rgba(214,170,90,0.07)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -s);
+      ctx.bezierCurveTo(s * 0.7, -s * 0.6, s * 0.7, s * 0.2, 0, s);
+      ctx.bezierCurveTo(-s * 0.7, s * 0.2, -s * 0.7, -s * 0.6, 0, -s);
+      ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, -s * 0.15, s * 0.18, 0, Math.PI * 2);
+      ctx.stroke();
+      for (const sx of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(0, s * 0.3);
+        ctx.quadraticCurveTo(sx * s * 0.9, s * 0.1, sx * s * 0.6, -s * 0.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    motif(128, 128, 70); motif(384, 128, 70);
+    motif(0, 384, 70); motif(256, 384, 70); motif(512, 384, 70);
+    grain(ctx, w, h, 3000, r);
+  });
+}
+
+// 짙은 호두나무 결
+export function woodTexture() {
+  return canvasTexture(512, 512, (ctx, w, h) => {
+    const r = rand(9);
+    ctx.fillStyle = '#3a2216';
+    ctx.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 2) {
+      const v = Math.sin(y * 0.05 + Math.sin(y * 0.013) * 3) * 0.5 + 0.5;
+      ctx.fillStyle = `rgba(${90 + v * 40},${50 + v * 25},${30 + v * 12},${0.25 + r() * 0.2})`;
+      ctx.fillRect(0, y, w, 2);
+    }
+    for (let i = 0; i < 40; i++) {
+      ctx.strokeStyle = `rgba(20,10,5,${0.1 + r() * 0.2})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      const y = r() * h;
+      ctx.moveTo(0, y);
+      ctx.bezierCurveTo(w * 0.3, y + (r() - 0.5) * 20, w * 0.7, y + (r() - 0.5) * 20, w, y + (r() - 0.5) * 10);
+      ctx.stroke();
+    }
+  });
+}
+
+// 라운지 러그
+export function rugTexture() {
+  return canvasTexture(1024, 1024, (ctx, w, h) => {
+    const r = rand(21);
+    ctx.fillStyle = '#1d2a44';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#c9a14a'; ctx.lineWidth = 14;
+    ctx.strokeRect(40, 40, w - 80, h - 80);
+    ctx.lineWidth = 4;
+    ctx.strokeRect(80, 80, w - 160, h - 160);
+    ctx.strokeStyle = 'rgba(201,161,74,0.55)'; ctx.lineWidth = 3;
+    for (let i = 0; i < 6; i++) {
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, 60 + i * 55, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    for (let i = 0; i < 16; i++) {
+      ctx.rotate(Math.PI / 8);
+      ctx.beginPath(); ctx.moveTo(60, 0); ctx.lineTo(340, 0); ctx.stroke();
+    }
+    ctx.restore();
+    for (let i = 0; i < 20000; i++) {
+      ctx.fillStyle = r() > 0.5 ? `rgba(255,255,255,${r() * 0.05})` : `rgba(0,0,0,${r() * 0.12})`;
+      ctx.fillRect(r() * w, r() * h, 1.5, 1.5);
+    }
+  });
+}
+
+// 줄무늬 (팝콘 통 / 매대 전면)
+export function stripeTexture(a = '#c8102e', b = '#f7f1e3', count = 10) {
+  return canvasTexture(256, 256, (ctx, w, h) => {
+    const sw = w / count;
+    for (let i = 0; i < count; i++) {
+      ctx.fillStyle = i % 2 ? b : a;
+      ctx.fillRect(i * sw, 0, sw, h);
+    }
+  });
+}
+
+function fitFont(ctx, text, weight, maxSize, maxWidth) {
+  let size = maxSize;
+  do {
+    ctx.font = `${weight} ${size}px ${FONT}`;
+    if (ctx.measureText(text).width <= maxWidth) break;
+    size -= 2;
+  } while (size > 10);
+  return size;
+}
+
+function wrapLines(ctx, text, maxWidth, maxLines) {
+  const words = String(text || '').split(/\s+/).filter(Boolean);
+  const lines = [];
+  let line = '';
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  // 너무 긴 단어는 글자 단위로 자르기
+  const out = [];
+  for (const l of lines) {
+    if (ctx.measureText(l).width <= maxWidth) { out.push(l); continue; }
+    let part = '';
+    for (const ch of Array.from(l)) {
+      if (ctx.measureText(part + ch).width > maxWidth && part) { out.push(part); part = ch; }
+      else part += ch;
+    }
+    if (part) out.push(part);
+  }
+  if (out.length > maxLines) {
+    const kept = out.slice(0, maxLines);
+    let last = kept[maxLines - 1];
+    while (ctx.measureText(last + '…').width > maxWidth && last.length) last = last.slice(0, -1);
+    kept[maxLines - 1] = last + '…';
+    return kept;
+  }
+  return out;
+}
+
+// 영화 포스터 (라이트박스에 들어갈 이미지)
+export function posterTexture(film, index, eventTitle) {
+  const color = film.poster_color || '#c0392b';
+  return canvasTexture(600, 900, (ctx, w, h) => {
+    const r = rand(1000 + index * 77);
+    // 배경
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, shadeHex(color, 0.12));
+    g.addColorStop(0.55, color);
+    g.addColorStop(1, shadeHex(color, -0.38));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+
+    // 빛줄기
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    for (let i = 0; i < 5; i++) {
+      const x = r() * w;
+      const lg = ctx.createLinearGradient(x, 0, x + 120, h * 0.7);
+      lg.addColorStop(0, 'rgba(255,255,255,0.20)');
+      lg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = lg;
+      ctx.beginPath();
+      ctx.moveTo(x, 0); ctx.lineTo(x + 30 + r() * 40, 0);
+      ctx.lineTo(x + 260, h * 0.75); ctx.lineTo(x + 160, h * 0.75);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+
+    // 중앙 그래픽: 겹친 원 + 실루엣 지평선
+    const cx = w * (0.35 + r() * 0.3), cy = h * 0.36;
+    const rg = ctx.createRadialGradient(cx, cy, 10, cx, cy, 230);
+    rg.addColorStop(0, 'rgba(255,240,210,0.85)');
+    rg.addColorStop(0.35, 'rgba(255,220,170,0.35)');
+    rg.addColorStop(1, 'rgba(255,220,170,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath(); ctx.arc(cx, cy, 230, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,248,235,0.92)';
+    ctx.beginPath(); ctx.arc(cx, cy, 70 + r() * 30, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = shadeHex(color, -0.5);
+    ctx.beginPath();
+    ctx.moveTo(0, h * 0.58);
+    let x = 0;
+    while (x < w) {
+      const nx = x + 30 + r() * 60;
+      ctx.lineTo(nx, h * (0.47 + r() * 0.1));
+      x = nx;
+    }
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath(); ctx.fill();
+    // 작은 인물 실루엣
+    const fx = w * (0.3 + r() * 0.4), fy = h * 0.6;
+    ctx.fillStyle = 'rgba(10,5,10,0.9)';
+    ctx.beginPath(); ctx.arc(fx, fy - 46, 9, 0, Math.PI * 2); ctx.fill();
+    ctx.fillRect(fx - 8, fy - 36, 16, 36);
+
+    // 하단 어둡게
+    const bg = ctx.createLinearGradient(0, h * 0.55, 0, h);
+    bg.addColorStop(0, 'rgba(0,0,0,0)');
+    bg.addColorStop(1, 'rgba(0,0,0,0.75)');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, h * 0.55, w, h * 0.45);
+
+    // 텍스트
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = `700 22px ${FONT}`;
+    ctx.fillText(`NO.${String(index + 1).padStart(2, '0')}  ·  WORLD PREMIERE`, w / 2, 58);
+
+    const title = film.title || '';
+    ctx.font = `800 64px ${FONT}`;
+    let size = 64;
+    let lines = wrapLines(ctx, title, w - 80, 2);
+    while (lines.length > 1 && size > 40 && lines.some((l) => ctx.measureText(l).width > w - 80)) {
+      size -= 4; ctx.font = `800 ${size}px ${FONT}`; lines = wrapLines(ctx, title, w - 80, 2);
+    }
+    const lineH = size * 1.15;
+    let ty = h - 190 - (lines.length - 1) * lineH;
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#ffffff';
+    for (const l of lines) { ctx.fillText(l, w / 2, ty); ty += lineH; }
+    ctx.shadowBlur = 0;
+
+    const meta = [film.director ? `감독 ${film.director}` : '', film.runtime || ''].filter(Boolean).join('   |   ');
+    if (meta) {
+      fitFont(ctx, meta, 600, 26, w - 80);
+      ctx.fillStyle = 'rgba(255,236,200,0.9)';
+      ctx.fillText(meta, w / 2, h - 130);
+    }
+
+    // 빌링 블록 느낌의 크레딧 라인
+    ctx.fillStyle = 'rgba(255,255,255,0.45)';
+    ctx.font = `500 13px ${FONT}`;
+    const credit = `${eventTitle || 'ONLINE PREMIERE'} PRESENTS  ·  A FILM BY ${film.director || 'DIRECTOR'}  ·  SCREENING SELECTION`;
+    fitFont(ctx, credit, 500, 14, w - 70);
+    ctx.fillText(credit, w / 2, h - 74);
+    ctx.fillRect(w / 2 - 120, h - 58, 240, 1);
+    ctx.font = `700 15px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,226,140,0.8)';
+    ctx.fillText('NOW SHOWING', w / 2, h - 34);
+
+    grain(ctx, w, h, 9000, r);
+  });
+}
+
+// 전광판(마키) 텍스트
+export function marqueeTexture(title) {
+  return canvasTexture(1024, 192, (ctx, w, h) => {
+    ctx.fillStyle = '#0c0610';
+    ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(255,214,120,0.75)';
+    ctx.font = `700 22px ${FONT}`;
+    ctx.fillText('★  NOW SHOWING  ★', w / 2, 34);
+    const t = title || 'ONLINE PREMIERE';
+    fitFont(ctx, t, 800, 84, w - 80);
+    ctx.shadowColor = '#ffcf5a'; ctx.shadowBlur = 24;
+    ctx.fillStyle = '#ffeec2';
+    ctx.fillText(t, w / 2, h / 2 + 22);
+  });
+}
+
+// 포토월 (스텝 앤 리피트)
+export function photoWallTexture(title) {
+  return canvasTexture(1024, 560, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#f8f4ee'); g.addColorStop(1, '#ece4d8');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    const t = (title || 'ONLINE PREMIERE').toUpperCase();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const cols = 4, rows = 6;
+    for (let row = 0; row < rows; row++) {
+      for (let col = -1; col <= cols; col++) {
+        const x = (col + 0.5 + (row % 2 ? 0.5 : 0)) * (w / cols);
+        const y = (row + 0.5) * (h / rows);
+        if (row % 2) {
+          ctx.fillStyle = '#b08a3e';
+          ctx.font = `800 20px ${FONT}`;
+          ctx.fillText('★ PREMIERE ★', x, y);
+        } else {
+          ctx.fillStyle = '#2a1430';
+          fitFont(ctx, t, 800, 24, w / cols - 30);
+          ctx.fillText(t, x, y);
+        }
+      }
+    }
+  });
+}
+
+export function signTexture(text, { bg = '#5a0f1c', fg = '#ffe3a0', w = 512, h = 128 } = {}) {
+  return canvasTexture(w, h, (ctx) => {
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#d4a548'; ctx.lineWidth = 6;
+    ctx.strokeRect(8, 8, w - 16, h - 16);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    fitFont(ctx, text, 800, Math.round(h * 0.52), w - 60);
+    ctx.shadowColor = fg; ctx.shadowBlur = 16;
+    ctx.fillStyle = fg;
+    ctx.fillText(text, w / 2, h / 2 + 3);
+  });
+}
+
+// 바닥 접지 그림자용 부드러운 원
+export function softShadowTexture() {
+  return canvasTexture(128, 128, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(0,0,0,0.55)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  }, { srgb: false });
+}
+
+// 바닥 빛웅덩이(스포트라이트 느낌 보강)
+export function glowTexture() {
+  return canvasTexture(256, 256, (ctx, w, h) => {
+    const g = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+    g.addColorStop(0, 'rgba(255,220,150,0.9)');
+    g.addColorStop(0.4, 'rgba(255,200,120,0.35)');
+    g.addColorStop(1, 'rgba(255,200,120,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+  });
+}

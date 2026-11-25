@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Online Premiere</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <link rel="stylesheet" href="/css/style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script src="/api/config"></script>
+</head>
+<body class="lobby">
+  <canvas id="world" aria-label="시사회장"></canvas>
+
+  <header class="hud-top">
+    <div class="event">
+      <p class="event-kicker">NOW SHOWING</p>
+      <h1 id="eventTitle">ONLINE PREMIERE</h1>
+      <p id="eventSubtitle" class="event-sub"></p>
+    </div>
+    <button id="profileChip" class="profile-chip" type="button" hidden>
+      <canvas id="chipAvatar" width="72" height="72"></canvas>
+      <span id="chipName"></span>
+      <span class="chip-edit">변경</span>
+    </button>
+  </header>
+
+  <div class="hint" id="hint">
+    <span class="hint-desktop"><kbd>←↑↓→</kbd> / <kbd>WASD</kbd> 이동 · 클릭으로 이동 · 팜플렛 앞에서 <kbd>E</kbd> 시청<span class="only-3d"> · 휠로 확대/축소</span></span>
+    <span class="hint-mobile">바닥을 터치해 이동 · 팜플렛을 터치해 다가가기<span class="only-3d"> · 두 손가락으로 확대</span></span>
+  </div>
+
+  <section id="nearCard" class="near-card" aria-live="polite" hidden>
+    <div class="near-color" id="nearColor"></div>
+    <div class="near-body">
+      <p class="near-meta" id="nearMeta"></p>
+      <h2 id="nearTitle"></h2>
+      <p class="near-desc" id="nearDesc"></p>
+    </div>
+    <button id="watchBtn" class="btn btn-gold" type="button">▶ 시청하기</button>
+  </section>
+
+  <!-- 닉네임 / 캐릭터 생성 -->
+  <div id="onboard" class="modal" hidden>
+    <div class="modal-card onboard-card" role="dialog" aria-modal="true" aria-labelledby="onboardTitle">
+      <p class="event-kicker">WELCOME</p>
+      <h2 id="onboardTitle">시사회장에 입장하기</h2>
+      <p class="muted">닉네임을 입력하면 이 기기 전용 캐릭터가 만들어져요.</p>
+      <div class="avatar-stage">
+        <canvas id="previewAvatar" width="320" height="320"></canvas>
+      </div>
+      <form id="onboardForm" autocomplete="off">
+        <input id="nicknameInput" maxlength="12" placeholder="닉네임 (최대 12자)" required />
+        <div class="row">
+          <button id="rerollBtn" class="btn btn-ghost" type="button">🎲 다시 뽑기</button>
+          <button class="btn btn-gold" type="submit">입장하기</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 영상 팝업 -->
+  <div id="player" class="modal modal-dark" hidden>
+    <div class="player-card" role="dialog" aria-modal="true" aria-labelledby="playerTitle">
+      <div class="player-head">
+        <div>
+          <p class="near-meta" id="playerMeta"></p>
+          <h2 id="playerTitle"></h2>
+        </div>
+        <button id="closePlayer" class="icon-btn" type="button" aria-label="닫기">✕</button>
+      </div>
+      <div class="player-frame" id="playerFrame"></div>
+      <p class="player-foot">
+        재생이 안 되나요? 잠시 후 다시 시도하거나 <a id="driveLink" target="_blank" rel="noopener">드라이브에서 열기</a>
+      </p>
+    </div>
+  </div>
+
+  <div id="loading" class="loading">
+    <div class="reel"></div>
+    <p id="loadingText">시사회장을 준비하고 있어요…</p>
+  </div>
+
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>
