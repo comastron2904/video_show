@@ -188,6 +188,11 @@ async function createBestWorld(opts) {
 async function main() {
   const isTouch = matchMedia('(pointer: coarse)').matches;
   document.body.classList.toggle('touch', isTouch);
+  // 길게 누를 때 뜨는 메뉴/선택 방지 (입력창 제외)
+  document.addEventListener('contextmenu', (e) => { if (e.target.tagName === 'CANVAS') e.preventDefault(); });
+  document.addEventListener('selectstart', (e) => {
+    if (!['INPUT', 'TEXTAREA'].includes(e.target.tagName)) e.preventDefault();
+  });
 
   const { films, settings, demo } = await loadData();
   $('eventTitle').textContent = settings.event_title;
