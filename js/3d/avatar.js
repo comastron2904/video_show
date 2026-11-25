@@ -143,9 +143,9 @@ export function createAvatar(look) {
   let phase = 0;
   let speedSmooth = 0;
 
-  function update(dt, moving, time) {
+  function update(dt, moving, time, running = false) {
     speedSmooth += ((moving ? 1 : 0) - speedSmooth) * Math.min(1, dt * 10);
-    if (moving) phase += dt * 11;
+    if (moving) phase += dt * (running ? 18 : 11);
     const s = Math.sin(phase) * speedSmooth;
     legs[0].rotation.x = s * 0.7;
     legs[1].rotation.x = -s * 0.7;
