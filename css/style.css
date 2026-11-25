@@ -153,6 +153,7 @@ body.touch .hint-desktop { display: none; }
   border: 2px solid var(--line); display: grid; place-items: center; overflow: hidden;
 }
 .avatar-stage canvas { width: 160px; height: 160px; }
+.avatar-stage canvas.preview3d { width: 160px; height: 160px; }
 #onboardForm input {
   width: 100%; padding: 13px 14px; border-radius: 12px;
   background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15);
