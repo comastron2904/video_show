@@ -14,7 +14,8 @@ import {
 } from './3d/textures.js';
 
 const WALL_H = 4.2;
-const SPEED = 2.4;          // m/s
+const WALK_SPEED = 2.0;     // m/s
+const RUN_SPEED = 4.4;      // m/s (달리기)
 const NEAR_DIST = 1.35;     // 팜플렛 앞 지점과의 거리
 const P_RADIUS = 0.28;
 const CAM_AZ = 0.62;        // 카메라 방위각 (약 35°)
@@ -296,7 +297,7 @@ export async function createWorld(canvas, options) {
   // ---------------- 카메라 / 후처리 ----------------
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
   const portrait = () => window.innerHeight > window.innerWidth;
-  let dist = portrait() ? 21 : 16;
+  let dist = portrait() ? 19 : 14;
   let distTarget = dist;
   const camTarget = new THREE.Vector3(player.x, 0.9, player.z);
   const camDir = new THREE.Vector3(Math.sin(CAM_AZ) * Math.cos(CAM_EL), Math.sin(CAM_EL), Math.cos(CAM_AZ) * Math.cos(CAM_EL));
@@ -342,6 +343,8 @@ export async function createWorld(canvas, options) {
   let stuck = 0;
   let paused = false;
   let near = null;
+  let runToggle = false;   // 달리기 버튼
+  let shiftDown = false;   // Shift 를 누르고 있는 동안 달리기
 
   const KEYMAP = {
     ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down',
@@ -350,6 +353,7 @@ export async function createWorld(canvas, options) {
   const isTyping = (e) => { const t = e.target; return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable); };
 
   function onKeyDown(e) {
+    if (e.key === 'Shift') shiftDown = true;
     if (paused || isTyping(e)) return;
     if (KEYMAP[e.code]) {
       keys.add(KEYMAP[e.code]);
@@ -364,7 +368,10 @@ export async function createWorld(canvas, options) {
       distTarget = Math.min(30, distTarget + 2);
     }
   }
-  function onKeyUp(e) { if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]); }
+  function onKeyUp(e) {
+    if (e.key === 'Shift') shiftDown = false;
+    if (KEYMAP[e.code]) keys.delete(KEYMAP[e.code]);
+  }
 
   const raycaster = new THREE.Raycaster();
   const ndc = new THREE.Vector2();
@@ -467,7 +474,7 @@ export async function createWorld(canvas, options) {
     player.moving = false;
     const len = Math.hypot(dx, dz);
     if (len > 0) {
-      let step = SPEED * dt;
+      let step = (runToggle || shiftDown ? RUN_SPEED : WALK_SPEED) * dt;
       if (path && !keys.size) step = Math.min(step, Math.hypot(path[0].x - player.x, path[0].z - player.z));
       const moved = tryMove((dx / len) * step, (dz / len) * step);
       player.yaw = angleLerp(player.yaw, Math.atan2(dx, dz), Math.min(1, dt * 12));
@@ -509,7 +516,7 @@ export async function createWorld(canvas, options) {
     // 캐릭터
     avatar.root.position.set(player.x, 0, player.z);
     avatar.root.rotation.y = player.yaw;
-    avatar.update(dt, player.moving, time);
+    avatar.update(dt, player.moving, time, player.moving && (runToggle || shiftDown));
     blob.position.set(player.x, 0.012, player.z);
 
     // 카메라
@@ -543,7 +550,7 @@ export async function createWorld(canvas, options) {
 
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('blur', () => keys.clear());
+  window.addEventListener('blur', () => { keys.clear(); shiftDown = false; });
   window.addEventListener('resize', resize);
   canvas.addEventListener('pointerdown', onPointerDown);
   canvas.addEventListener('pointermove', onPointerMove);
@@ -597,6 +604,7 @@ export async function createWorld(canvas, options) {
       if (p) path = null;
     },
     activateNear() { if (near) options.onActivate?.(near.film); },
+    setRunning(v) { runToggle = !!v; },
     // 3D 캐릭터 모델이 있을 때만 미리보기 제공 (없으면 null → 2D 미리보기 사용)
     getPreview() {
       if (!charLib) return null;
