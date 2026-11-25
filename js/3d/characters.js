@@ -19,11 +19,15 @@ const TARGET_HEIGHT = 1.35;
 
 let libraryPromise = null;
 
-// list.json 은 ["a.glb", ...] 또는 { "files": [...], "scale": 2 } 형태
+// list.json 은 ["a.glb", ...] 또는 { "files": [...], "scale": 2, "width": 0.85 } 형태
+//  scale : 전체 크기 배율
+//  width : 몸집(가로·앞뒤 두께) 배율. 1보다 작으면 날씬해집니다.
 let modelScale = null;
+let widthScale = 1;
 async function resolveFileList() {
   const cfg = window.__CHARACTERS__ || {};
   if (cfg.scale) modelScale = Number(cfg.scale) || null;
+  if (cfg.width) widthScale = Number(cfg.width) || 1;
   if (Array.isArray(cfg.files) && cfg.files.length) return cfg.files;
   try {
     const r = await fetch(`${BASE}list.json`, { cache: 'no-cache' });
@@ -31,6 +35,7 @@ async function resolveFileList() {
       const data = await r.json();
       const list = Array.isArray(data) ? data : data.files;
       if (!Array.isArray(data) && data.scale && !modelScale) modelScale = Number(data.scale) || null;
+      if (!Array.isArray(data) && data.width) widthScale = Number(data.width) || 1;
       if (Array.isArray(list) && list.length) return list;
     }
   } catch { /* 목록 파일 없음 */ }
@@ -80,7 +85,7 @@ export function instantiateCharacter(lib, seed) {
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
   const scale = modelScale || (size.y > 0 ? TARGET_HEIGHT / size.y : 1);
-  model.scale.setScalar(scale);
+  model.scale.set(scale * widthScale, scale, scale * widthScale);
   model.position.y = -box.min.y * scale;
   const rotY = Number((window.__CHARACTERS__ || {}).rotationY) || 0;
   model.rotation.y = rotY;
@@ -91,30 +96,40 @@ export function instantiateCharacter(lib, seed) {
   const clips = entry.gltf.animations || [];
   const mixer = clips.length ? new THREE.AnimationMixer(model) : null;
   const idleClip = findClip(clips, [/^idle$/i, /idle/i, /static/i, /stand/i]) || clips[0] || null;
-  const walkClip = findClip(clips, [/^walk$/i, /walk/i, /jog/i, /run/i, /sprint/i]);
-  const idle = mixer && idleClip ? mixer.clipAction(idleClip) : null;
-  const walk = mixer && walkClip ? mixer.clipAction(walkClip) : null;
-  if (idle) idle.play();
-  if (walk) { walk.play(); walk.setEffectiveWeight(0); }
+  const walkClip = findClip(clips, [/^walk$/i, /walk/i, /jog/i]);
+  const runClip = findClip(clips, [/^sprint$/i, /^run$/i, /sprint/i, /run/i]);
+  const actions = {
+    idle: mixer && idleClip ? mixer.clipAction(idleClip) : null,
+    walk: mixer && walkClip ? mixer.clipAction(walkClip) : null,
+    run: mixer && runClip ? mixer.clipAction(runClip) : null,
+  };
+  // 달리기 동작이 없으면 걷기 동작을 빠르게 재생
+  if (!actions.run && actions.walk) actions.run = actions.walk;
+  let state = 'idle';
+  let current = actions.idle;
+  current?.play();
 
-  let walking = false;
   let bobPhase = 0;
+  const baseY = -box.min.y * scale;
 
-  function update(dt, moving) {
-    if (walk && idle) {
-      if (moving !== walking) {
-        walking = moving;
-        const from = moving ? idle : walk;
-        const to = moving ? walk : idle;
-        to.enabled = true;
-        to.setEffectiveTimeScale(1);
-        to.setEffectiveWeight(1);
-        from.crossFadeTo(to, 0.22, false);
-      }
-    } else if (!walk) {
-      // 걷기 동작이 없는 모델: 살짝 통통 튀는 걸음으로 대신
-      bobPhase = moving ? bobPhase + dt * 12 : 0;
-      model.position.y = -box.min.y * scale + Math.abs(Math.sin(bobPhase)) * 0.05;
+  function update(dt, moving, _time, running) {
+    const next = !moving ? 'idle' : running ? 'run' : 'walk';
+    if (next !== state && actions[next]) {
+      const to = actions[next];
+      to.reset();
+      to.setEffectiveTimeScale(next === 'run' && to === actions.walk ? 1.7 : 1);
+      to.setEffectiveWeight(1);
+      to.play();
+      if (current && current !== to) current.crossFadeTo(to, 0.2, false);
+      current = to;
+      state = next;
+    } else if (next !== state) {
+      state = next;
+    }
+    if (!actions.walk) {
+      // 걷기 동작이 없는 모델: 통통 튀는 걸음으로 대신
+      bobPhase = moving ? bobPhase + dt * (running ? 20 : 12) : 0;
+      model.position.y = baseY + Math.abs(Math.sin(bobPhase)) * 0.05;
     }
     mixer?.update(dt);
   }
@@ -146,12 +161,13 @@ export function createCharacterPreview(lib) {
   let seed = null;
 
   function frame(mode) {
+    const h = current ? current.height : TARGET_HEIGHT;
     if (mode === 'face') {
-      camera.position.set(0, TARGET_HEIGHT * 0.78, 1.55);
-      camera.lookAt(0, TARGET_HEIGHT * 0.72, 0);
+      camera.position.set(0, h * 0.78, h * 1.15);
+      camera.lookAt(0, h * 0.72, 0);
     } else {
-      camera.position.set(0, TARGET_HEIGHT * 0.62, 3.6);
-      camera.lookAt(0, TARGET_HEIGHT * 0.5, 0);
+      camera.position.set(0, h * 0.62, h * 2.65);
+      camera.lookAt(0, h * 0.5, 0);
     }
   }
 
