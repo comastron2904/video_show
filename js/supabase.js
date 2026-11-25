@@ -1,5 +1,5 @@
 // Supabase 클라이언트 준비
-// /api/config 가 window.__SUPABASE__ 에 접속 정보를 넣어 줍니다.
+// js/config.js 에 적은 접속 정보(window.__SUPABASE__)를 사용합니다.
 // 정보가 없으면(로컬 미리보기 등) null 을 돌려주고, 사이트는 데모 데이터로 동작합니다.
 
 let clientPromise = null;
@@ -8,10 +8,16 @@ export function getSupabase() {
   if (clientPromise) return clientPromise;
   clientPromise = (async () => {
     const cfg = window.__SUPABASE__ || {};
-    if (!cfg.url || !cfg.anonKey) return null;
+    const url = String(cfg.url || '').trim();
+    const anonKey = String(cfg.anonKey || '').trim();
+    if (!url || !anonKey || anonKey.startsWith('YOUR_')) return null;
+    if (anonKey.startsWith('sb_secret_')) {
+      console.error('[premiere] js/config.js 에 secret 키가 들어 있습니다. Publishable 키(sb_publishable_...) 또는 anon public 키로 바꾸세요.');
+      return null;
+    }
     try {
       const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-      return createClient(cfg.url, cfg.anonKey, {
+      return createClient(url, anonKey, {
         auth: { persistSession: true, autoRefreshToken: true },
       });
     } catch (err) {
