@@ -14,5 +14,6 @@
     "character-male-f.glb",
     "character-male-g.glb"
   ],
-  "scale": 2.0
+  "scale": 1.3,
+  "width": 0.82
 }
