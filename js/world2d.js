@@ -1,5 +1,8 @@
 // 아이소메트릭 시사회장 (Canvas 2D)
 import { drawCharacter } from './character.js';
+import { loadPosition, autoSavePosition } from './position.js';
+
+const POS_KEY = 'premiere.pos2d.v1';
 
 const HW = 32;          // 타일 반폭(px)
 const HH = 16;          // 타일 반높이(px)
@@ -111,6 +114,8 @@ export function createWorld(canvas, options) {
     state.layout = buildLayout(state.films);
     state.player.x = state.layout.spawn.x;
     state.player.y = state.layout.spawn.y;
+    const saved = loadPosition(POS_KEY);
+    if (saved && !blocked(saved.x, saved.z)) { state.player.x = saved.x; state.player.y = saved.z; }
     const p = iso(state.player.x, state.player.y);
     state.cam.x = p.x; state.cam.y = p.y - 40;
     state.near = null;
@@ -555,6 +560,7 @@ export function createWorld(canvas, options) {
   resize();
   resetLayout();
   raf = requestAnimationFrame(loop);
+  autoSavePosition(POS_KEY, () => ({ x: state.player.x, z: state.player.y }));
 
   return {
     setFilms(films) { state.films = films; resetLayout(); },
