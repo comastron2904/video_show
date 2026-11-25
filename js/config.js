@@ -14,5 +14,5 @@
 
 window.__SUPABASE__ = {
   url: 'https://oztnwiksjbywfibeupwq.supabase.co',
-  anonKey: 'YOUR_SUPABASE_PUBLISHABLE_OR_ANON_KEY',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96dG53aWtzamJ5d2ZpYmV1cHdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU1NTA3MDYsImV4cCI6MjExMTEyNjcwNn0.yQH53IEtZnCfKjEr05WUt1ZgAFFIU6I7yxKXHWhG15c',
 };
