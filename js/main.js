@@ -236,6 +236,16 @@ async function main() {
     world.setPaused(false);
   });
 
+  // 달리기 토글 버튼
+  const runBtn = $('runBtn');
+  runBtn.hidden = false;
+  runBtn.addEventListener('click', () => {
+    const on = runBtn.getAttribute('aria-pressed') !== 'true';
+    runBtn.setAttribute('aria-pressed', String(on));
+    runBtn.querySelector('.run-label').textContent = on ? '달리는 중' : '달리기';
+    world.setRunning?.(on);
+  });
+
   $('watchBtn').addEventListener('click', () => openPlayer(currentFilm, demo));
   $('closePlayer').addEventListener('click', closePlayer);
   $('player').addEventListener('click', (e) => { if (e.target === $('player')) closePlayer(); });
@@ -248,4 +258,3 @@ main().catch((err) => {
   console.error(err);
   $('loading').querySelector('p').textContent = '불러오는 중 문제가 생겼어요. 새로고침해 주세요.';
 });
-
