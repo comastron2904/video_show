@@ -11,18 +11,26 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 const BASE = '/models/characters/';
-const KENNEY_DEFAULT = ['a', 'b', 'c', 'd', 'e', 'f'].flatMap((k) => [`character-female-${k}.glb`, `character-male-${k}.glb`]);
+const KENNEY_DEFAULT = [
+  ...['a', 'b', 'c', 'd', 'e', 'f'].map((k) => `character-female-${k}.glb`),
+  ...['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((k) => `character-male-${k}.glb`),
+];
 const TARGET_HEIGHT = 1.35;
 
 let libraryPromise = null;
 
+// list.json 은 ["a.glb", ...] 또는 { "files": [...], "scale": 2 } 형태
+let modelScale = null;
 async function resolveFileList() {
   const cfg = window.__CHARACTERS__ || {};
+  if (cfg.scale) modelScale = Number(cfg.scale) || null;
   if (Array.isArray(cfg.files) && cfg.files.length) return cfg.files;
   try {
     const r = await fetch(`${BASE}list.json`, { cache: 'no-cache' });
     if (r.ok) {
-      const list = await r.json();
+      const data = await r.json();
+      const list = Array.isArray(data) ? data : data.files;
+      if (!Array.isArray(data) && data.scale && !modelScale) modelScale = Number(data.scale) || null;
       if (Array.isArray(list) && list.length) return list;
     }
   } catch { /* 목록 파일 없음 */ }
@@ -68,10 +76,10 @@ export function instantiateCharacter(lib, seed) {
     }
   });
 
-  // 크기와 바닥 높이 맞추기
+  // 크기와 바닥 높이 맞추기 (고정 배율이 있으면 모든 캐릭터를 같은 비율로)
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
-  const scale = size.y > 0 ? TARGET_HEIGHT / size.y : 1;
+  const scale = modelScale || (size.y > 0 ? TARGET_HEIGHT / size.y : 1);
   model.scale.setScalar(scale);
   model.position.y = -box.min.y * scale;
   const rotY = Number((window.__CHARACTERS__ || {}).rotationY) || 0;
@@ -111,7 +119,7 @@ export function instantiateCharacter(lib, seed) {
     mixer?.update(dt);
   }
 
-  return { root, update, height: TARGET_HEIGHT, file: entry.file };
+  return { root, update, height: Math.max(1, size.y * scale), file: entry.file };
 }
 
 // 온보딩/프로필용 미리보기 렌더러
