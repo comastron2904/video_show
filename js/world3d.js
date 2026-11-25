@@ -384,38 +384,79 @@ export async function createWorld(canvas, options) {
     stuck = 0;
   }
 
-  function handleTap(clientX, clientY) {
-    if (paused) return;
+  // 화면 좌표 → 팜플렛 또는 바닥 지점
+  function pickAt(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
     ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
     raycaster.setFromCamera(ndc, camera);
     const hits = raycaster.intersectObjects(pickables, false);
     if (hits.length) {
       const s = stands.find((st) => st.index === hits[0].object.userData.stand);
-      if (s) {
-        if (near === s) { options.onActivate?.(s.film); return; }
-        pendingStand = s;
-        walkTo(s.front.x, s.front.z);
-        return;
+      if (s) return { stand: s };
+    }
+    if (!raycaster.ray.intersectPlane(floorPlane, hit)) return null;
+    // 손가락은 정확하지 않으니 팜플렛 근처 바닥을 눌러도 팜플렛으로 인정
+    for (const s of stands) {
+      if (Math.hypot(hit.x - s.front.x, hit.z - s.front.z) < 0.75 || (Math.abs(hit.x - s.x) < 0.9 && Math.abs(hit.z - s.z) < 0.6)) {
+        return { stand: s };
       }
     }
-    if (raycaster.ray.intersectPlane(floorPlane, hit)) {
-      pendingStand = null;
-      walkTo(Math.max(0.5, Math.min(W - 0.5, hit.x)), Math.max(0.5, Math.min(D - 0.5, hit.z)));
+    return { x: Math.max(0.5, Math.min(W - 0.5, hit.x)), z: Math.max(0.5, Math.min(D - 0.5, hit.z)) };
+  }
+
+  // 터치 지점 표시 (물결 링)
+  const ripple = new THREE.Mesh(new THREE.RingGeometry(0.22, 0.3, 40), new THREE.MeshBasicMaterial({ color: 0xffe28a, transparent: true, opacity: 0, depthWrite: false }));
+  ripple.rotation.x = -Math.PI / 2;
+  ripple.renderOrder = 3;
+  scene.add(ripple);
+  let rippleT = 1;
+  function showRipple(x, z) {
+    ripple.position.set(x, 0.02, z);
+    rippleT = 0;
+  }
+
+  let tripRun = false;     // 두 번 탭 → 그 지점까지 달리기
+  let steer = null;        // 누른 채로 끌면 손가락 방향으로 계속 이동
+  let lastTap = { t: 0, x: 0, y: 0 };
+
+  function handleTap(clientX, clientY, run) {
+    if (paused) return;
+    const target = pickAt(clientX, clientY);
+    if (!target) return;
+    tripRun = !!run;
+    if (target.stand) {
+      const s = target.stand;
+      if (near === s) { options.onActivate?.(s.film); return; }
+      pendingStand = s;
+      walkTo(s.front.x, s.front.z);
+      showRipple(s.front.x, s.front.z);
+      return;
     }
+    pendingStand = null;
+    walkTo(target.x, target.z);
+    showRipple(target.x, target.z);
   }
 
   const pointers = new Map();
-  let pinchStart = 0, pinchDist0 = 0, downInfo = null;
+  let pinchStart = 0, pinchDist0 = 0, downInfo = null, lastSteer = 0;
   function onPointerDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
     canvas.setPointerCapture?.(e.pointerId);
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    if (pointers.size === 1) downInfo = { x: e.clientX, y: e.clientY, t: performance.now() };
+    if (pointers.size === 1) {
+      const now = performance.now();
+      const dbl = now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 45;
+      lastTap = { t: now, x: e.clientX, y: e.clientY };
+      downInfo = { x: e.clientX, y: e.clientY, t: now, dragging: false };
+      // 손을 떼기를 기다리지 않고 바로 이동 시작
+      handleTap(e.clientX, e.clientY, dbl);
+    }
     if (pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       pinchStart = Math.hypot(a.x - b.x, a.y - b.y);
       pinchDist0 = distTarget;
       downInfo = null;
+      steer = null;
     }
   }
   function onPointerMove(e) {
@@ -425,16 +466,30 @@ export async function createWorld(canvas, options) {
       const [a, b] = [...pointers.values()];
       const d = Math.hypot(a.x - b.x, a.y - b.y);
       distTarget = Math.max(8, Math.min(30, pinchDist0 * (pinchStart / Math.max(20, d))));
+      return;
+    }
+    if (pointers.size === 1 && downInfo && !paused) {
+      if (!downInfo.dragging && Math.hypot(e.clientX - downInfo.x, e.clientY - downInfo.y) > 14) downInfo.dragging = true;
+      const now = performance.now();
+      if (downInfo.dragging && now - lastSteer > 50) {
+        lastSteer = now;
+        const t = pickAt(e.clientX, e.clientY);
+        if (t) {
+          steer = t.stand ? { x: t.stand.front.x, z: t.stand.front.z } : { x: t.x, z: t.z };
+          pendingStand = t.stand || null;
+          path = null;
+        }
+      }
     }
   }
   function onPointerUp(e) {
     pointers.delete(e.pointerId);
     if (pointers.size < 2) pinchStart = 0;
-    if (downInfo && pointers.size === 0) {
-      const moved = Math.hypot(e.clientX - downInfo.x, e.clientY - downInfo.y);
-      if (moved < 12 && performance.now() - downInfo.t < 600) handleTap(e.clientX, e.clientY);
+    if (pointers.size === 0) {
+      if (steer) { walkTo(steer.x, steer.z); showRipple(steer.x, steer.z); }
+      steer = null;
+      downInfo = null;
     }
-    if (pointers.size === 0) downInfo = null;
   }
   function onWheel(e) {
     e.preventDefault();
@@ -460,6 +515,12 @@ export async function createWorld(canvas, options) {
       if (keys.has('down')) { dx -= fwd.x; dz -= fwd.z; }
       if (keys.has('right')) { dx += right.x; dz += right.z; }
       if (keys.has('left')) { dx -= right.x; dz -= right.z; }
+      if (keys.size) { tripRun = false; steer = null; }
+      if (!dx && !dz && steer) {
+        const tx = steer.x - player.x, tz = steer.z - player.z;
+        const d = Math.hypot(tx, tz);
+        if (d > 0.12) { dx = tx / d; dz = tz / d; }
+      }
       if (!dx && !dz && path) {
         const wp = path[0];
         const tx = wp.x - player.x, tz = wp.z - player.z;
@@ -474,7 +535,7 @@ export async function createWorld(canvas, options) {
     player.moving = false;
     const len = Math.hypot(dx, dz);
     if (len > 0) {
-      let step = (runToggle || shiftDown ? RUN_SPEED : WALK_SPEED) * dt;
+      let step = (runToggle || shiftDown || tripRun ? RUN_SPEED : WALK_SPEED) * dt;
       if (path && !keys.size) step = Math.min(step, Math.hypot(path[0].x - player.x, path[0].z - player.z));
       const moved = tryMove((dx / len) * step, (dz / len) * step);
       player.yaw = angleLerp(player.yaw, Math.atan2(dx, dz), Math.min(1, dt * 12));
@@ -492,7 +553,7 @@ export async function createWorld(canvas, options) {
       near = best;
       options.onNear?.(best ? best.film : null);
     }
-    if (pendingStand && !path) {
+    if (pendingStand && !path && !steer) {
       if (near === pendingStand) player.yaw = angleLerp(player.yaw, Math.PI, 1);
       pendingStand = null;
     }
@@ -516,7 +577,13 @@ export async function createWorld(canvas, options) {
     // 캐릭터
     avatar.root.position.set(player.x, 0, player.z);
     avatar.root.rotation.y = player.yaw;
-    avatar.update(dt, player.moving, time, player.moving && (runToggle || shiftDown));
+    avatar.update(dt, player.moving, time, player.moving && (runToggle || shiftDown || tripRun));
+    if (!path && !steer) tripRun = false;
+    if (rippleT < 1) {
+      rippleT = Math.min(1, rippleT + dt * 2.2);
+      ripple.scale.setScalar(0.6 + rippleT * 1.4);
+      ripple.material.opacity = (1 - rippleT) * 0.9;
+    }
     blob.position.set(player.x, 0.012, player.z);
 
     // 카메라
