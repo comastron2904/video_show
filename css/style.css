@@ -25,11 +25,21 @@ body {
 button, input, textarea, select { font: inherit; color: inherit; }
 
 /* ---------- 로비 ---------- */
-body.lobby { overflow: hidden; overscroll-behavior: none; }
+body.lobby {
+  overflow: hidden; overscroll-behavior: none;
+  /* 모바일에서 터치할 때 화면 전체가 파랗게 선택/강조되는 현상 방지 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+}
+body.lobby input, body.lobby textarea { -webkit-user-select: text; user-select: text; }
+body.lobby button { touch-action: manipulation; }
+#world:focus, .world3d:focus { outline: none; }
 #world, .world3d {
   position: fixed; inset: 0;
   width: 100vw; height: 100vh; height: 100dvh;
   display: block; touch-action: none; cursor: pointer;
+  -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
 }
 
 .hud-top {
