@@ -14,7 +14,7 @@ import {
 } from './3d/textures.js';
 
 const WALL_H = 4.2;
-const SPEED = 2.7;          // m/s
+const SPEED = 2.4;          // m/s
 const NEAR_DIST = 1.35;     // 팜플렛 앞 지점과의 거리
 const P_RADIUS = 0.28;
 const CAM_AZ = 0.62;        // 카메라 방위각 (약 35°)
