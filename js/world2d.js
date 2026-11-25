@@ -5,6 +5,7 @@ const HW = 32;          // 타일 반폭(px)
 const HH = 16;          // 타일 반높이(px)
 const WALL_H = 120;     // 벽 높이(px)
 const SPEED = 3.6;      // 이동 속도(타일/초)
+const RUN_MULT = 1.9;   // 달리기 배속
 const NEAR_DIST = 1.9;  // 팜플렛 상호작용 거리
 const P_RADIUS = 0.28;
 
@@ -164,6 +165,7 @@ export function createWorld(canvas, options) {
   }
 
   function onKeyDown(e) {
+    if (e.key === 'Shift') state.shift = true;
     if (state.paused || isTyping(e)) return;
     if (KEYMAP[e.code]) {
       state.keys.add(KEYMAP[e.code]);
@@ -174,7 +176,10 @@ export function createWorld(canvas, options) {
       options.onActivate?.(state.near.film);
     }
   }
-  function onKeyUp(e) { if (KEYMAP[e.code]) state.keys.delete(KEYMAP[e.code]); }
+  function onKeyUp(e) {
+    if (e.key === 'Shift') state.shift = false;
+    if (KEYMAP[e.code]) state.keys.delete(KEYMAP[e.code]);
+  }
 
   function screenToWorld(clientX, clientY) {
     const rect = canvas.getBoundingClientRect();
@@ -227,10 +232,11 @@ export function createWorld(canvas, options) {
     const len = Math.hypot(dx, dy);
     pl.moving = false;
     if (len > 0) {
-      const step = Math.min(SPEED * dt, state.target && !state.keys.size ? Math.hypot(state.target.x - pl.x, state.target.y - pl.y) : Infinity);
+      const running = state.run || state.shift;
+      const step = Math.min(SPEED * (running ? RUN_MULT : 1) * dt, state.target && !state.keys.size ? Math.hypot(state.target.x - pl.x, state.target.y - pl.y) : Infinity);
       const moved = tryMove((dx / len) * step, (dy / len) * step);
       pl.dir = faceFrom(dx, dy);
-      if (moved) { pl.moving = true; pl.walk += dt * 11; state.stuckTime = 0; }
+      if (moved) { pl.moving = true; pl.walk += dt * (running ? 18 : 11); state.stuckTime = 0; }
       else if (state.target) {
         state.stuckTime += dt;
         if (state.stuckTime > 0.25) state.target = null;
@@ -543,7 +549,7 @@ export function createWorld(canvas, options) {
   window.addEventListener('resize', resize);
   window.addEventListener('keydown', onKeyDown);
   window.addEventListener('keyup', onKeyUp);
-  window.addEventListener('blur', () => state.keys.clear());
+  window.addEventListener('blur', () => { state.keys.clear(); state.shift = false; });
   canvas.addEventListener('pointerdown', onPointerDown);
 
   resize();
@@ -554,6 +560,7 @@ export function createWorld(canvas, options) {
     setFilms(films) { state.films = films; resetLayout(); },
     setLook(look, nickname) { state.look = look; state.nickname = nickname; },
     setTitle(t) { state.title = t; },
+    setRunning(v) { state.run = !!v; },
     setPaused(p) { state.paused = p; state.keys.clear(); if (p) state.target = null; },
     activateNear() { if (state.near) options.onActivate?.(state.near.film); },
     destroy() { cancelAnimationFrame(raf); },
