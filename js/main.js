@@ -12,10 +12,16 @@ async function loadData() {
       .eq('visible', true).order('sort_order').order('created_at'),
     sb.from('site_settings').select('event_title,event_subtitle').eq('id', 1).maybeSingle(),
   ]);
-  if (filmsRes.error) console.error(filmsRes.error);
+  const err = filmsRes.error || settingsRes.error;
+  if (err) {
+    console.error('[premiere] Supabase 요청 실패:', err.message || err, err);
+    if (filmsRes.status === 401 || settingsRes.status === 401) {
+      console.error('[premiere] 401: SUPABASE_ANON_KEY 가 이 프로젝트의 anon(public) 또는 publishable 키가 아닙니다. js/config.js 의 anonKey 를 확인하세요.');
+    }
+  }
   return {
     films: filmsRes.data || [],
-    settings: settingsRes.data || DEMO_SETTINGS,
+    settings: settingsRes.data || { event_title: 'ONLINE PREMIERE', event_subtitle: '온라인 시사회에 오신 것을 환영합니다' },
     demo: false,
   };
 }
