@@ -38,11 +38,24 @@ async function checkAdmin() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) { show('login'); notice(''); return; }
   const { data, error } = await sb.from('admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
-  if (error || !data) {
+  if (error) {
+    console.error('[premiere] 관리자 확인 실패', error);
+    show('login');
+    $('logoutBtn').hidden = false;
+    const perm = error.code === '42501' || /permission denied/i.test(error.message || '');
+    const missing = error.code === '42P01' || error.code === 'PGRST205' || /does not exist|could not find/i.test(error.message || '');
+    notice(`관리자 권한을 확인하는 중 오류가 났어요: <code>${escapeHtml(error.code || '')} ${escapeHtml(error.message || '')}</code><br/>
+      ${perm ? '테이블 접근 권한(grant)이 없습니다. <code>supabase/schema.sql</code> 을 다시 실행하세요 (권한 부여 구문이 포함되어 있습니다).'
+        : missing ? '테이블이 없습니다. <code>supabase/schema.sql</code> 을 이 프로젝트의 SQL Editor 에서 실행하세요.'
+        : '브라우저 콘솔(F12)의 오류 내용을 확인하세요.'}`);
+    return;
+  }
+  if (!data) {
     show('login');
     $('logoutBtn').hidden = false;
     notice(`<strong>${escapeHtml(session.user.email)}</strong> 계정은 아직 관리자로 등록되지 않았어요.<br/>
-      Supabase SQL Editor에서 <code>insert into public.admins (user_id) select id from auth.users where email = '이메일';</code> 을 실행한 뒤 새로고침하세요.`);
+      Supabase SQL Editor에서 <code>insert into public.admins (user_id) select id from auth.users where email = '이메일';</code> 을 실행한 뒤 새로고침하세요.<br/>
+      <small>로그인한 사용자 ID: <code>${escapeHtml(session.user.id)}</code></small>`);
     return;
   }
   notice('');
