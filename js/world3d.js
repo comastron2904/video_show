@@ -9,6 +9,9 @@ import { createAvatar } from './3d/avatar.js';
 import { loadCharacterLibrary, instantiateCharacter, createCharacterPreview } from './3d/characters.js';
 import { createNavGrid } from './3d/pathfind.js';
 import * as P from './3d/props.js';
+import { loadPosition, autoSavePosition } from './position.js';
+
+const POS_KEY = 'premiere.pos3d.v1';
 import {
   marbleTexture, carpetTexture, wallpaperTexture, marqueeTexture, softShadowTexture, setMaxAnisotropy,
 } from './3d/textures.js';
@@ -286,6 +289,12 @@ export async function createWorld(canvas, options) {
   scene.add(blob);
 
   const player = { x: L.spawn.x, z: L.spawn.z, yaw: Math.PI, moving: false };
+  // 재접속 시 마지막 위치에서 시작 (홀 밖이거나 물체와 겹치면 입구에서 시작)
+  const saved = loadPosition(POS_KEY);
+  if (saved && !blocked(saved.x, saved.z)) {
+    player.x = saved.x; player.z = saved.z;
+    if (Number.isFinite(saved.yaw)) player.yaw = saved.yaw;
+  }
 
   // 이름표 (HTML)
   const tag = document.createElement('div');
@@ -651,6 +660,7 @@ export async function createWorld(canvas, options) {
     raf = requestAnimationFrame(loop);
   }
   raf = requestAnimationFrame(loop);
+  autoSavePosition(POS_KEY, () => player);
 
   if (new URLSearchParams(location.search).has('debug')) {
     window.__premiereDebug = { layout: L, colliders, nav, stands, player, blocked };
