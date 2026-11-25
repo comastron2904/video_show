@@ -248,3 +248,4 @@ main().catch((err) => {
   console.error(err);
   $('loading').querySelector('p').textContent = '불러오는 중 문제가 생겼어요. 새로고침해 주세요.';
 });
+
