@@ -88,6 +88,23 @@ body.mode-3d .only-3d { display: inline; }
 body.touch .hint-mobile { display: inline; }
 body.touch .hint-desktop { display: none; }
 
+/* ---------- 달리기 버튼 ---------- */
+.run-btn {
+  position: fixed; right: 20px; bottom: max(24px, env(safe-area-inset-bottom)); z-index: 6;
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 18px 11px 14px; border-radius: 999px; cursor: pointer;
+  background: var(--panel); border: 1px solid var(--line); backdrop-filter: blur(8px);
+  font-weight: 700; font-size: 14px; color: var(--text);
+  box-shadow: 0 10px 30px rgba(0,0,0,.35);
+  transition: background .2s, border-color .2s, transform .15s;
+}
+.run-btn:hover { border-color: var(--gold); }
+.run-btn:active { transform: scale(0.96); }
+.run-btn .run-icon { font-size: 18px; }
+.run-btn[aria-pressed='true'] {
+  background: linear-gradient(180deg, var(--gold-2), var(--gold)); color: #2a1606; border-color: transparent;
+}
+
 /* ---------- 팜플렛 근접 카드 ---------- */
 .near-card {
   position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
@@ -198,6 +215,9 @@ body.touch .hint-desktop { display: none; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 600px) {
+  .run-btn { bottom: calc(max(24px, env(safe-area-inset-bottom)) + 96px); right: 12px; padding: 12px; }
+  .run-btn .run-label { display: none; }
+  .run-btn .run-icon { font-size: 22px; }
   .hud-top { padding: max(12px, env(safe-area-inset-top)) 12px 12px; }
   .event-sub { display: none; }
   .profile-chip { padding-right: 10px; }
@@ -209,4 +229,3 @@ body.touch .hint-desktop { display: none; }
   .btn { padding: 11px 14px; font-size: 14px; }
   .hint { font-size: 12px; }
 }
-
