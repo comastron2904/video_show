@@ -38,6 +38,19 @@ function paintChip(look) {
   const c = $('chipAvatar');
   const ctx = c.getContext('2d');
   ctx.clearRect(0, 0, c.width, c.height);
+  const preview = world?.getPreview?.();
+  if (preview) {
+    const img = new Image();
+    img.onload = () => {
+      ctx.save();
+      ctx.beginPath(); ctx.arc(36, 36, 36, 0, Math.PI * 2); ctx.clip();
+      ctx.fillStyle = '#2a1a3a'; ctx.fillRect(0, 0, 72, 72);
+      ctx.drawImage(img, 0, 0, 72, 72);
+      ctx.restore();
+    };
+    img.src = preview.snapshot(look.seed || 0);
+    return;
+  }
   ctx.save();
   ctx.beginPath(); ctx.arc(36, 36, 36, 0, Math.PI * 2); ctx.clip();
   ctx.fillStyle = '#2a1a3a'; ctx.fillRect(0, 0, 72, 72);
@@ -55,9 +68,22 @@ function openOnboarding(current) {
     input.value = current?.nickname || '';
     let raf = 0;
     const start = performance.now();
+    let last = start;
+    // 3D 캐릭터 모델이 있으면 3D 미리보기, 없으면 2D 미리보기
+    const preview = world?.getPreview?.();
+    const stage = canvas.parentElement;
+    if (preview) {
+      preview.canvas.className = 'preview3d';
+      if (preview.canvas.parentElement !== stage) stage.appendChild(preview.canvas);
+      canvas.hidden = true;
+    }
     const tick = (now) => {
       const name = input.value.trim() || '손님';
-      paintAvatar(canvas, generateLook(name, roll), { scale: 4.2, t: (now - start) / 1000 });
+      const look = generateLook(name, roll);
+      const t = (now - start) / 1000;
+      if (preview) preview.render(look.seed, (now - last) / 1000, 'full', Math.sin(t * 0.8) * 0.5);
+      else paintAvatar(canvas, look, { scale: 4.2, t });
+      last = now;
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
