@@ -248,3 +248,4 @@ function drawHair(ctx, look, hx, hy, back, side) {
   ctx.fillStyle = 'rgba(255,255,255,0.18)';
   ctx.beginPath(); ctx.ellipse(hx - 4, hy - 8, 4, 1.8, -0.4, 0, Math.PI * 2); ctx.fill();
 }
+
