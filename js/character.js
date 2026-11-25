@@ -1,10 +1,13 @@
 // 닉네임 기반 캐릭터 자동 생성 + 캔버스 드로잉
 
-const SKINS = ['#ffe0c7', '#f9d1b0', '#eab48c', '#c98e66', '#8d5a3c'];
-const HAIRS = ['#2b2018', '#4a3020', '#7a4a2a', '#c48a3f', '#e8c872', '#a83c32', '#3b4a6b', '#d9d9d9', '#e37fa6'];
+const SKINS = ['#f6d7c3', '#eec1a2', '#e0ac88', '#c68c66', '#a26a4a', '#7a4a32'];
+const HAIRS = ['#1c1714', '#2b2019', '#3d2b1f', '#5a3e2b', '#7b5a3c', '#a07850', '#c9a678', '#8d8a86'];
 const HAIR_STYLES = ['short', 'long', 'bun', 'spiky', 'cap', 'bob'];
-const SHIRTS = ['#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6', '#e67e22', '#1abc9c', '#ecf0f1', '#34495e', '#ff7aa2'];
-const PANTS = ['#2c3e50', '#34495e', '#5d4037', '#1e3a5f', '#4a4a4a', '#7f8c8d'];
+const SHIRTS = ['#f2f0eb', '#1f2a44', '#2b2b2e', '#8a8f96', '#6b7b5a', '#7a2e3a', '#c9b79c', '#3e5f8a', '#d8cfc0', '#4a3b33'];
+const PANTS = ['#2f3f5c', '#3b4f73', '#1f1f22', '#3a3a3d', '#6b6a63', '#b8a88a', '#4b4036'];
+const JACKETS = ['#2d2a28', '#4a3b2c', '#1f2b3d', '#5a5f55', '#7a6a52', '#3a2228'];
+const SHOES = ['#2a2420', '#efece6', '#4a3424', '#1a1a1c', '#7b6a58'];
+const TOPS = ['tee', 'tee', 'shirt', 'jacket'];
 const ACCESSORIES = ['none', 'none', 'glasses', 'scarf', 'none', 'popcorn'];
 
 const PROFILE_KEY = 'premiere.profile.v1';
@@ -43,6 +46,10 @@ export function generateLook(nickname, roll = 0) {
     pants: pick(r, PANTS),
     accessory: pick(r, ACCESSORIES),
     capColor: pick(r, SHIRTS),
+    top: pick(r, TOPS),
+    jacket: pick(r, JACKETS),
+    shoe: pick(r, SHOES),
+    seed: Math.floor(r() * 1e9), // 3D 캐릭터 모델 선택용
   };
   if (look.capColor === look.shirt) look.capColor = SHIRTS[(SHIRTS.indexOf(look.shirt) + 3) % SHIRTS.length];
   return look;
