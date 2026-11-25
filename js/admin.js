@@ -281,7 +281,7 @@ $('filmForm').addEventListener('submit', async (e) => {
     demo = true;
     films = DEMO_FILMS.map((f, i) => ({ ...f, drive_url: '', sort_order: i, visible: true }));
     notice(`<strong>데모 모드</strong> · Supabase가 아직 연결되지 않았어요. 화면과 링크 변환은 시험해 볼 수 있지만 저장되지는 않아요.<br/>
-      Vercel 환경변수 <code>SUPABASE_URL</code>, <code>SUPABASE_ANON_KEY</code> 를 설정하면 실제로 저장됩니다.`);
+      <code>js/config.js</code> 파일에 Supabase 주소와 키를 넣으면 실제로 저장됩니다.`);
     show('admin');
     loadAll();
     return;
