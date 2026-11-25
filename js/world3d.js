@@ -6,6 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createAvatar } from './3d/avatar.js';
+import { loadCharacterLibrary, instantiateCharacter, createCharacterPreview } from './3d/characters.js';
 import { createNavGrid } from './3d/pathfind.js';
 import * as P from './3d/props.js';
 import {
@@ -60,7 +61,12 @@ export async function createWorld(canvas, options) {
   const films = options.films || [];
   const isTouch = matchMedia('(pointer: coarse)').matches;
 
-  await loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독']);
+  const [, charLib] = await Promise.all([
+    loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독']),
+    loadCharacterLibrary(),
+  ]);
+  const makeAvatar = (look) => (charLib ? instantiateCharacter(charLib, look.seed || 0) : createAvatar(look));
+  let preview = null;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   let pixelRatio = Math.min(window.devicePixelRatio || 1, isTouch ? 1.5 : 2);
@@ -271,7 +277,7 @@ export async function createWorld(canvas, options) {
   const nav = createNavGrid(W, D, colliders, { radius: P_RADIUS + 0.05 });
 
   // ---------------- 캐릭터 ----------------
-  let avatar = createAvatar(options.look);
+  let avatar = makeAvatar(options.look);
   scene.add(avatar.root);
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: softShadowTexture(), transparent: true, depthWrite: false, opacity: 0.7 }));
   blob.rotation.x = -Math.PI / 2;
@@ -517,7 +523,7 @@ export async function createWorld(canvas, options) {
 
   function updateTag() {
     if (tag.hidden) return;
-    tagPos.set(player.x, avatar.height + 0.32 + avatar.root.children[0].position.y, player.z).project(camera);
+    tagPos.set(player.x, avatar.height + 0.3, player.z).project(camera);
     const rect = canvas.getBoundingClientRect();
     const x = rect.left + (tagPos.x * 0.5 + 0.5) * rect.width;
     const y = rect.top + (-tagPos.y * 0.5 + 0.5) * rect.height;
@@ -580,7 +586,7 @@ export async function createWorld(canvas, options) {
     mode: '3d',
     setLook(look, nickname) {
       scene.remove(avatar.root);
-      avatar = createAvatar(look);
+      avatar = makeAvatar(look);
       scene.add(avatar.root);
       tag.textContent = nickname || '';
       tag.hidden = !nickname;
@@ -591,6 +597,12 @@ export async function createWorld(canvas, options) {
       if (p) path = null;
     },
     activateNear() { if (near) options.onActivate?.(near.film); },
+    // 3D 캐릭터 모델이 있을 때만 미리보기 제공 (없으면 null → 2D 미리보기 사용)
+    getPreview() {
+      if (!charLib) return null;
+      if (!preview) preview = createCharacterPreview(charLib);
+      return preview;
+    },
     destroy() {
       cancelAnimationFrame(raf);
       tag.remove();
