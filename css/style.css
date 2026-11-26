@@ -130,7 +130,8 @@ body.touch .hint-desktop { display: none; }
 .vote-item:hover { background: rgba(255,255,255,.07); }
 .vote-item[aria-checked='true'] { border-color: var(--gold); background: rgba(229,185,92,.12); }
 .vote-item.mine { border-color: var(--gold); }
-.vote-thumb { width: 44px; height: 62px; border-radius: 6px; flex-shrink: 0; background: #333 center / cover no-repeat; }
+.vote-thumb { width: 44px; height: auto; aspect-ratio: 2 / 3; border-radius: 6px; flex-shrink: 0; background: #333 center / cover no-repeat; }
+.vote-thumb.landscape { width: 96px; }
 .vote-info { flex: 1; min-width: 0; }
 .vote-info strong { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vote-info span { font-size: 12px; color: var(--muted); }
