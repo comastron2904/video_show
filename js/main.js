@@ -8,7 +8,7 @@ async function loadData() {
   const sb = await getSupabase();
   if (!sb) return { films: DEMO_FILMS, settings: DEMO_SETTINGS, demo: true };
   const [filmsRes, settingsRes] = await Promise.all([
-    sb.from('films').select('id,title,director,runtime,description,file_id,poster_color,sort_order')
+    sb.from('films').select('*')
       .eq('visible', true).order('sort_order').order('created_at'),
     sb.from('site_settings').select('event_title,event_subtitle').eq('id', 1).maybeSingle(),
   ]);
@@ -148,7 +148,14 @@ function showNear(film) {
   const card = $('nearCard');
   $('hint').hidden = !!film;
   if (!film) { card.hidden = true; return; }
-  $('nearColor').style.background = film.poster_color || '#c0392b';
+  const thumb = $('nearColor');
+  if (/^(https?:|blob:)/.test(film.thumbnail_url || '')) {
+    thumb.style.background = `${film.poster_color || '#c0392b'} url("${encodeURI(film.thumbnail_url)}") center / cover no-repeat`;
+    thumb.classList.add('has-img');
+  } else {
+    thumb.style.background = film.poster_color || '#c0392b';
+    thumb.classList.remove('has-img');
+  }
   $('nearTitle').textContent = film.title;
   $('nearMeta').textContent = [film.director, film.runtime].filter(Boolean).join(' · ') || '상영작';
   $('nearDesc').textContent = film.description || '';
