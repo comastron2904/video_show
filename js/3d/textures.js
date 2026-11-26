@@ -14,7 +14,7 @@ function rand(seed) {
 }
 
 let maxAniso = 8;
-export function setMaxAnisotropy(v) { maxAniso = Math.min(8, v || 1); }
+export function setMaxAnisotropy(v) { maxAniso = Math.min(16, v || 1); }
 
 export function canvasTexture(w, h, draw, { repeat = null, srgb = true } = {}) {
   const c = document.createElement('canvas');
@@ -440,5 +440,149 @@ export function glowTexture() {
     g.addColorStop(1, 'rgba(255,200,120,0)');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
+  });
+}
+
+// 명예의 거리 별 타일
+export function starTileTexture() {
+  return canvasTexture(256, 256, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#3a2430'); g.addColorStop(1, '#2a1822');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#b8893a'; ctx.lineWidth = 6;
+    ctx.strokeRect(6, 6, w - 12, h - 12);
+    const star = (cx, cy, R, r) => {
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = -Math.PI / 2 + (i * Math.PI) / 5;
+        const rad = i % 2 ? r : R;
+        ctx.lineTo(cx + Math.cos(a) * rad, cy + Math.sin(a) * rad);
+      }
+      ctx.closePath();
+    };
+    star(w / 2, h / 2 + 6, 100, 42);
+    ctx.fillStyle = '#e8a6b4'; ctx.fill();
+    ctx.lineWidth = 7; ctx.strokeStyle = '#d4a548'; ctx.stroke();
+    star(w / 2, h / 2 + 6, 70, 29);
+    ctx.lineWidth = 2; ctx.strokeStyle = 'rgba(212,165,72,0.6)'; ctx.stroke();
+  });
+}
+
+// 벽에 거는 빈티지 영화 포스터
+const VINTAGE = [
+  { t: 'SILVER SCREEN', s: '은막의 밤', bg: '#1f3b5c', fg: '#f3d9a4' },
+  { t: 'MIDNIGHT REEL', s: '자정의 필름', bg: '#4a1a2a', fg: '#ffd27a' },
+  { t: 'THE FINAL CUT', s: '마지막 장면', bg: '#20332a', fg: '#f0e6c8' },
+  { t: 'STARLIGHT', s: '별빛 극장', bg: '#3a2a52', fg: '#ffe9b0' },
+  { t: 'OPENING NIGHT', s: '개봉 첫날', bg: '#5a2e16', fg: '#ffe2a6' },
+  { t: 'CINEMA PARADISE', s: '시네마 천국', bg: '#17323a', fg: '#f6d38a' },
+  { t: 'GOLDEN ERA', s: '황금시대', bg: '#2d2418', fg: '#e9c46a' },
+  { t: 'LIGHTS · CAMERA', s: '조명, 카메라', bg: '#3b1d3f', fg: '#ffd6e0' },
+];
+export function vintagePosterTexture(i) {
+  const v = VINTAGE[i % VINTAGE.length];
+  return canvasTexture(400, 600, (ctx, w, h) => {
+    const r = rand(500 + i * 13);
+    ctx.fillStyle = v.bg;
+    ctx.fillRect(0, 0, w, h);
+    // 선버스트
+    ctx.save();
+    ctx.translate(w / 2, h * 0.42);
+    for (let k = 0; k < 24; k++) {
+      ctx.rotate((Math.PI * 2) / 24);
+      ctx.fillStyle = k % 2 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.08)';
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(420, -55); ctx.lineTo(420, 55); ctx.closePath(); ctx.fill();
+    }
+    ctx.restore();
+    // 원형 엠블럼
+    ctx.strokeStyle = v.fg; ctx.lineWidth = 6;
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.42, 95, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.42, 80, 0, Math.PI * 2); ctx.stroke();
+    // 필름 릴
+    ctx.fillStyle = v.fg;
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.42, 52, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = v.bg;
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + r();
+      ctx.beginPath(); ctx.arc(w / 2 + Math.cos(a) * 30, h * 0.42 + Math.sin(a) * 30, 11, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(w / 2, h * 0.42, 8, 0, Math.PI * 2); ctx.fill();
+    // 텍스트
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = v.fg;
+    ctx.font = `800 20px ${FONT}`;
+    ctx.fillText('★ ★ ★', w / 2, 52);
+    fitFont(ctx, v.t, 800, 44, w - 50);
+    ctx.fillText(v.t, w / 2, h * 0.73);
+    ctx.font = `600 22px ${FONT}`;
+    ctx.globalAlpha = 0.85;
+    ctx.fillText(v.s, w / 2, h * 0.8);
+    ctx.globalAlpha = 1;
+    ctx.fillRect(w / 2 - 80, h * 0.86, 160, 2);
+    ctx.font = `600 13px ${FONT}`;
+    ctx.fillText('A CLASSIC PICTURE · NOW PLAYING', w / 2, h * 0.9);
+    ctx.strokeStyle = v.fg; ctx.lineWidth = 3;
+    ctx.strokeRect(14, 14, w - 28, h - 28);
+    grain(ctx, w, h, 6000, r);
+  });
+}
+
+// 입구 환영 입간판
+export function welcomeTexture(title) {
+  return canvasTexture(512, 720, (ctx, w, h) => {
+    const g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, '#2a1434'); g.addColorStop(1, '#14091c');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#d4a548'; ctx.lineWidth = 10;
+    ctx.strokeRect(18, 18, w - 36, h - 36);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(34, 34, w - 68, h - 68);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#e5b95c';
+    ctx.font = `700 26px ${FONT}`;
+    ctx.fillText('WELCOME', w / 2, 110);
+    ctx.fillStyle = '#ffffff';
+    fitFont(ctx, title || 'ONLINE PREMIERE', 800, 54, w - 100);
+    ctx.fillText(title || 'ONLINE PREMIERE', w / 2, 200);
+    ctx.fillStyle = '#e5b95c';
+    ctx.fillRect(w / 2 - 70, 250, 140, 3);
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = `600 30px ${FONT}`;
+    ctx.fillText('시사회에 오신 것을', w / 2, 340);
+    ctx.fillText('환영합니다', w / 2, 385);
+    ctx.font = `500 22px ${FONT}`;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText('팜플렛 앞에서 시청하기를 눌러', w / 2, 480);
+    ctx.fillText('작품을 감상하세요', w / 2, 515);
+    ctx.fillStyle = '#e5b95c';
+    ctx.font = `800 40px ${FONT}`;
+    ctx.fillText('★', w / 2, 620);
+  });
+}
+
+// 상영관 출입문 위 표지판
+export function doorSignTexture(label) {
+  return canvasTexture(512, 128, (ctx, w, h) => {
+    ctx.fillStyle = '#0d0710';
+    ctx.fillRect(0, 0, w, h);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    fitFont(ctx, label, 800, 60, w - 40);
+    ctx.shadowColor = '#7fd8ff'; ctx.shadowBlur = 18;
+    ctx.fillStyle = '#d8f3ff';
+    ctx.fillText(label, w / 2, h / 2 + 3);
+  });
+}
+
+export function exitSignTexture() {
+  return canvasTexture(256, 96, (ctx, w, h) => {
+    ctx.fillStyle = '#0e7a3e';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#eafff1';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 44px ${FONT}`;
+    ctx.fillText('EXIT 비상구', w / 2, h / 2 + 2);
   });
 }
