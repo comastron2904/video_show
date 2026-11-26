@@ -76,8 +76,22 @@
         <div class="span-2 preview-wrap" id="previewWrap" hidden>
           <div class="player-frame small" id="previewFrame"></div>
         </div>
+        <div class="span-2 thumb-field">
+          <span class="label">팜플렛 썸네일 <small>(포스터 이미지, 세로형 2:3 권장 · 없으면 자동 포스터)</small></span>
+          <div class="thumb-row">
+            <div class="thumb-preview" id="thumbPreview"><span>썸네일 없음</span></div>
+            <div class="thumb-controls">
+              <label class="btn btn-ghost btn-sm file-btn">이미지 파일 선택
+                <input id="fThumbFile" type="file" accept="image/*" hidden />
+              </label>
+              <input id="fThumbUrl" placeholder="또는 이미지 주소 붙여넣기 (https://…)" />
+              <button id="thumbClear" class="btn btn-ghost btn-sm" type="button">썸네일 지우기</button>
+              <p class="muted small" id="thumbNote">파일은 저장할 때 자동으로 줄여서 올라갑니다.</p>
+            </div>
+          </div>
+        </div>
         <div class="span-2">
-          <span class="label">팜플렛 색상</span>
+          <span class="label">팜플렛 색상 <small>(썸네일이 없을 때 자동 포스터 색)</small></span>
           <div class="swatches" id="swatches"></div>
         </div>
         <label class="check span-2"><input id="fVisible" type="checkbox" checked /> 시사회장에 공개</label>
