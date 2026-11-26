@@ -68,7 +68,7 @@ export async function createWorld(canvas, options) {
   const isTouch = matchMedia('(pointer: coarse)').matches;
 
   const [, charLib] = await Promise.all([
-    loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독']),
+    loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독 1관 2관 비상구 시사회에 오신 것을 환영합니다 팜플렛 앞에서 시청하기를 눌러 작품을 감상하세요 은막의 밤 자정의 필름 마지막 장면 별빛 극장 개봉 첫날 시네마 천국 황금시대 조명 카메라']),
     loadCharacterLibrary(),
   ]);
   const makeAvatar = (look) => (charLib ? instantiateCharacter(charLib, look.seed || 0) : createAvatar(look));
@@ -120,12 +120,27 @@ export async function createWorld(canvas, options) {
   key.position.set(center.x - 7, 15, center.z + 9);
   key.target.position.copy(center);
   key.castShadow = true;
-  key.shadow.mapSize.set(isTouch ? 1024 : 2048, isTouch ? 1024 : 2048);
-  const ext = Math.max(W, D) * 0.78;
+  const SHADOW_MAP = isTouch ? 1024 : 2048;
+  key.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
+  const ext = 16; // 플레이어 주변 반경 16m 만 그림자 계산 (넓은 홀에서도 선명하게)
   Object.assign(key.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 1, far: 50 });
   key.shadow.camera.updateProjectionMatrix();
-  key.shadow.bias = -0.0004;
-  key.shadow.normalBias = 0.03;
+  key.shadow.bias = -0.0005;
+  key.shadow.normalBias = 0.04;
+  const keyOffset = new THREE.Vector3(-7, 15, 9);
+  const lightRot = new THREE.Matrix4().lookAt(keyOffset, new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0));
+  const lightRotInv = lightRot.clone().invert();
+  const texel = (ext * 2) / SHADOW_MAP;
+  const snapV = new THREE.Vector3();
+  function followShadow(target) {
+    // 빛 좌표계에서 텍셀 단위로 맞춰 움직여야 그림자 가장자리가 지글거리지 않음
+    snapV.copy(target).applyMatrix4(lightRotInv);
+    snapV.x = Math.round(snapV.x / texel) * texel;
+    snapV.y = Math.round(snapV.y / texel) * texel;
+    snapV.applyMatrix4(lightRot);
+    key.target.position.copy(snapV);
+    key.position.copy(snapV).add(keyOffset);
+  }
   scene.add(key, key.target);
 
   const rim = new THREE.DirectionalLight(0x9fb4ff, 0.3);
@@ -136,7 +151,7 @@ export async function createWorld(canvas, options) {
   const marble = marbleTexture();
   marble.wrapS = marble.wrapT = THREE.RepeatWrapping;
   marble.repeat.set(W / 2, D / 2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: marble, roughness: 0.16, metalness: 0 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: marble, roughness: 0.3, metalness: 0 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(W / 2, 0, D / 2);
   floor.receiveShadow = true;
@@ -158,12 +173,12 @@ export async function createWorld(canvas, options) {
   cTex.repeat.set(2, carpetLen / 2);
   const carpet = new THREE.Mesh(new THREE.PlaneGeometry(2.0, carpetLen), new THREE.MeshStandardMaterial({ map: cTex, roughness: 1 }));
   carpet.rotation.x = -Math.PI / 2;
-  carpet.position.set(ax, 0.004, 0.9 + carpetLen / 2);
+  carpet.position.set(ax, 0.008, 0.9 + carpetLen / 2);
   carpet.receiveShadow = true;
   scene.add(carpet);
   for (const s of [-1, 1]) {
-    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.008, carpetLen), M.gold);
-    stripe.position.set(ax + s * 0.96, 0.006, 0.9 + carpetLen / 2);
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.012, carpetLen), M.gold);
+    stripe.position.set(ax + s * 0.96, 0.01, 0.9 + carpetLen / 2);
     stripe.receiveShadow = true;
     scene.add(stripe);
   }
@@ -236,7 +251,7 @@ export async function createWorld(canvas, options) {
   // ---------------- 라운지 ----------------
   const lz = D - 3.4;
   const rug = P.buildRug(M, 5.0, 4.6);
-  rug.position.set(3.4, 0.006, lz);
+  rug.position.set(3.4, 0.012, lz);
   scene.add(rug);
   place(P.buildSofa(M, M.velvetGreen, 2.4), 0.72, lz, Math.PI / 2);
   place(P.buildSofa(M, M.velvetGreen, 2.2), 3.6, lz - 1.85, 0);
@@ -270,6 +285,65 @@ export async function createWorld(canvas, options) {
   // 화분
   for (const [x, z] of [[ax - 3.9, 0.75], [ax + 3.9, 0.75], [ax - 2.2, D - 0.7], [ax + 2.2, D - 0.7], [W - 0.7, 0.75]]) {
     if (x > 6.8 && x < W - 0.5) place(P.buildPlant(M, 0.9), x, z, 0);
+  }
+
+  // ---------------- 추가 장식 ----------------
+  // 상영관 출입문 (뒷벽)
+  for (const [x, label] of [[W - 4.2, 'SCREEN 1 · 1관'], [9.8, 'SCREEN 2 · 2관']]) {
+    place(P.buildTheaterDoors(M, label), x, 0, 0, false);
+    addBox(x, 0.16, 3.3, 0.32);
+  }
+
+  // 빈티지 포스터 액자 (뒷벽 / 왼쪽 벽)
+  let frameIdx = 0;
+  for (const x of [13.6, 16.3, ax + 6.8, ax + 9.2]) {
+    if (x > W - 6) continue;
+    const f = P.buildWallFrame(M, frameIdx++);
+    f.position.set(x, 2.25, 0.02);
+    scene.add(f);
+  }
+  for (const z of [12, 15, 18, 21]) {
+    if (z > D - 9) continue;
+    const f = P.buildWallFrame(M, frameIdx++);
+    f.position.set(0.02, 2.3, z);
+    f.rotation.y = Math.PI / 2;
+    scene.add(f);
+  }
+
+  // 극장 의자 대기석 (왼쪽 벽 앞)
+  const seatZ = Math.min(16.5, D - 13);
+  place(P.buildSeatRow(M, 6), 1.55, seatZ, Math.PI / 2);
+  place(P.buildSeatRow(M, 6), 2.95, seatZ, Math.PI / 2);
+  place(P.buildFloorLamp(M), 0.7, seatZ - 2.6, 0);
+  place(P.buildFloorLamp(M), 0.7, seatZ + 2.6, 0);
+
+  // 스탠딩 테이블
+  for (const [x, z] of [[W - 2.8, 9], [W - 2.8, 15], [6.8, 12.5], [7.2, 20.5]]) {
+    if (z < D - 8) place(P.buildCocktailTable(M), x, z, 0);
+  }
+
+  // 빈티지 영화 카메라
+  const filmCam = place(P.buildFilmCamera(M), W - 3, D - 7.5, 0);
+  filmCam.group.rotation.y = -0.8;
+
+  // 환영 입간판
+  const welcome = place(P.buildWelcomeSign(M, options.title), ax + 2.8, D - 2.6, 0);
+  welcome.group.rotation.y = -0.25;
+
+  // 명예의 거리 별 타일 (레드카펫 양옆)
+  for (let z = 2.5; z < D - 5.5; z += 3) {
+    for (const sx of [-1, 1]) {
+      const st = P.buildStarTile();
+      st.position.x = ax + sx * 1.75;
+      st.position.z = z;
+      scene.add(st);
+    }
+  }
+
+  // 가장자리 화분
+  for (const z of [4, 12, 20]) place(P.buildPlant(M, 1.0), W - 0.8, z, 0);
+  for (const x of [10, 15.5, ax + 7.5, W - 4]) {
+    if (Math.abs(x - ax) > 3) place(P.buildPlant(M, 0.95), x, D - 0.8, 0);
   }
 
   // ---------------- 팜플렛 ----------------
@@ -308,16 +382,17 @@ export async function createWorld(canvas, options) {
   document.body.appendChild(tag);
 
   // ---------------- 카메라 / 후처리 ----------------
-  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 200);
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.8, 160);
   const portrait = () => window.innerHeight > window.innerWidth;
   let dist = portrait() ? 19 : 14;
   let distTarget = dist;
   const camTarget = new THREE.Vector3(player.x, 0.9, player.z);
   const camDir = new THREE.Vector3(Math.sin(CAM_AZ) * Math.cos(CAM_EL), Math.sin(CAM_EL), Math.cos(CAM_AZ) * Math.cos(CAM_EL));
 
-  const composer = new EffectComposer(renderer);
+  const msaa = renderer.capabilities.isWebGL2 !== false ? (isTouch ? 2 : 4) : 0;
+  const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: msaa }));
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.45, 0.5, 0.95);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.45, 1.0);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
 
@@ -424,7 +499,7 @@ export async function createWorld(canvas, options) {
   scene.add(ripple);
   let rippleT = 1;
   function showRipple(x, z) {
-    ripple.position.set(x, 0.02, z);
+    ripple.position.set(x, 0.05, z);
     rippleT = 0;
   }
 
@@ -582,6 +657,8 @@ export async function createWorld(canvas, options) {
       if (s.built.spot) s.built.spot.intensity = 22 + s.glowT * 16;
     }
 
+    for (const r of filmCam.reels) r.rotation.x += dt * 1.2;
+
     // 마키 전구 점멸
     const phase = Math.floor(time * 2.5) % 2;
     marquee.bulbsA.emissiveIntensity = phase ? 3.2 : 0.6;
@@ -597,7 +674,7 @@ export async function createWorld(canvas, options) {
       ripple.scale.setScalar(0.6 + rippleT * 1.4);
       ripple.material.opacity = (1 - rippleT) * 0.9;
     }
-    blob.position.set(player.x, 0.012, player.z);
+    blob.position.set(player.x, 0.035, player.z);
 
     // 카메라
     dist += (distTarget - dist) * Math.min(1, dt * 6);
@@ -606,6 +683,7 @@ export async function createWorld(canvas, options) {
     camTarget.z += (player.z - camTarget.z) * k;
     camera.position.copy(camTarget).addScaledVector(camDir, dist);
     camera.lookAt(camTarget);
+    followShadow(camTarget);
   }
 
   function updateTag() {
