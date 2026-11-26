@@ -79,9 +79,12 @@
           <p class="near-meta" id="playerMeta"></p>
           <h2 id="playerTitle"></h2>
         </div>
-        <button id="closePlayer" class="icon-btn" type="button" aria-label="닫기">✕</button>
+        <div class="player-actions">
+          <button id="fullPlayer" class="icon-btn" type="button" aria-label="전체화면" hidden>⛶</button>
+          <button id="closePlayer" class="icon-btn" type="button" aria-label="닫기">✕</button>
+        </div>
       </div>
-      <div class="player-frame" id="playerFrame"></div>
+      <div class="player-stage" id="playerStage"><div class="player-frame" id="playerFrame"></div></div>
       <p class="player-foot">
         재생이 안 되나요? 잠시 후 다시 시도하거나 <a id="driveLink" target="_blank" rel="noopener">드라이브에서 열기</a>
       </p>
