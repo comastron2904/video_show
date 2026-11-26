@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
   woodTexture, stripeTexture, signTexture, photoWallTexture, rugTexture, glowTexture, posterTexture,
+  starTileTexture, vintagePosterTexture, welcomeTexture, doorSignTexture, exitSignTexture,
 } from './textures.js';
 
 export function createMaterials() {
@@ -87,14 +88,14 @@ export function buildStand(film, index, eventTitle, M, { withLight = true } = {}
   // 바닥 빛웅덩이 + 상호작용 링
   const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), M.glow.clone());
   glow.rotation.x = -Math.PI / 2;
-  glow.position.set(0, 0.012, 0.75);
+  glow.position.set(0, 0.03, 0.75);
   glow.renderOrder = 2;
   g.add(glow);
 
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffe28a, transparent: true, opacity: 0, depthWrite: false });
   const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.58, 48), ringMat);
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(0, 0.015, 0.95);
+  ring.position.set(0, 0.04, 0.95);
   g.add(ring);
 
   // 포인트 컬러 띠 (받침 앞)
@@ -376,7 +377,7 @@ export function buildFloorLamp(M) {
 export function buildRug(M, w, d) {
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshStandardMaterial({ map: rugTexture(), roughness: 1 }));
   m.rotation.x = -Math.PI / 2;
-  m.position.y = 0.006;
+  m.position.y = 0.012;
   m.receiveShadow = true;
   return m;
 }
@@ -487,4 +488,215 @@ export function buildSconce(M) {
   shade.position.set(0, 0.06, 0.17);
   g.add(plate, arm, shade);
   return g;
+}
+
+
+// ---------------- 상영관 출입문 (벽에 붙임, +z 방향을 향함) ----------------
+export function buildTheaterDoors(M, label) {
+  const g = new THREE.Group();
+  const W = 3.0, H = 2.6;
+  const frame = mesh(new THREE.BoxGeometry(W + 0.3, H + 0.2, 0.14), M.gold);
+  frame.position.set(0, (H + 0.2) / 2, 0.07);
+  g.add(frame);
+  const leatherMat = new THREE.MeshPhysicalMaterial({ color: 0x5a0f1c, roughness: 0.55, clearcoat: 0.3 });
+  for (const s of [-1, 1]) {
+    const door = mesh(new RoundedBoxGeometry(W / 2 - 0.06, H - 0.06, 0.1, 3, 0.03), leatherMat);
+    door.position.set(s * (W / 4), H / 2, 0.15);
+    g.add(door);
+    // 단추 장식(체스터필드)
+    const studs = new THREE.InstancedMesh(new THREE.SphereGeometry(0.018, 8, 6), M.gold, 30);
+    const m4 = new THREE.Matrix4();
+    let k = 0;
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 5; c++) {
+        m4.makeTranslation(s * (W / 4) + (c - 2) * 0.24 + (r % 2 ? 0.12 : 0) * 0, 0.35 + r * 0.38, 0.205);
+        studs.setMatrixAt(k++, m4);
+      }
+    }
+    g.add(studs);
+    // 손잡이
+    const handle = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.6, 10), M.gold);
+    handle.position.set(s * 0.12, 1.15, 0.24);
+    g.add(handle);
+    // 동그란 창
+    const win = new THREE.Mesh(new THREE.CircleGeometry(0.13, 24), new THREE.MeshStandardMaterial({ color: 0x221a10, emissive: 0xffb860, emissiveIntensity: 0.6 }));
+    win.position.set(s * (W / 4), 1.9, 0.205);
+    g.add(win);
+  }
+  const signTex = doorSignTexture(label);
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 0.45), new THREE.MeshStandardMaterial({ map: signTex, emissive: 0xffffff, emissiveMap: signTex, emissiveIntensity: 1.1 }));
+  sign.position.set(0, H + 0.55, 0.16);
+  const signBox = mesh(new THREE.BoxGeometry(1.9, 0.55, 0.12), M.black);
+  signBox.position.set(0, H + 0.55, 0.09);
+  g.add(signBox, sign);
+  const exTex = exitSignTexture();
+  const exit = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.19), new THREE.MeshStandardMaterial({ map: exTex, emissive: 0xffffff, emissiveMap: exTex, emissiveIntensity: 1.2 }));
+  exit.position.set(W / 2 + 0.5, H + 0.3, 0.05);
+  g.add(exit);
+  const light = new THREE.PointLight(0x9fdcff, 1.5, 0, 2);
+  light.position.set(0, H + 0.4, 0.9);
+  g.add(light);
+  return { group: g, size: { w: W + 0.3, d: 0.3 } };
+}
+
+// ---------------- 벽 액자 (+z 방향을 향함) ----------------
+export function buildWallFrame(M, index, w = 0.9, h = 1.3) {
+  const g = new THREE.Group();
+  const frame = mesh(new RoundedBoxGeometry(w + 0.12, h + 0.12, 0.06, 2, 0.02), M.gold);
+  frame.position.z = 0.03;
+  const tex = vintagePosterTexture(index);
+  const pic = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.5 }));
+  pic.position.z = 0.062;
+  g.add(frame, pic);
+  // 액자 조명
+  const lamp = mesh(new THREE.CylinderGeometry(0.02, 0.02, w * 0.7, 10), M.brass);
+  lamp.rotation.z = Math.PI / 2;
+  lamp.position.set(0, h / 2 + 0.14, 0.14);
+  const arm = mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.14, 6), M.brass);
+  arm.rotation.x = Math.PI / 2;
+  arm.position.set(0, h / 2 + 0.14, 0.07);
+  const glowLine = new THREE.Mesh(new THREE.BoxGeometry(w * 0.66, 0.012, 0.012), M.bulb);
+  glowLine.position.set(0, h / 2 + 0.12, 0.16);
+  g.add(lamp, arm, glowLine);
+  return g;
+}
+
+// ---------------- 극장 의자 한 줄 (+z 방향을 향함) ----------------
+export function buildSeatRow(M, count = 4) {
+  const g = new THREE.Group();
+  const pitch = 0.62;
+  const seatMat = M.velvetRed;
+  const total = count * pitch;
+  const beam = mesh(new THREE.BoxGeometry(total, 0.05, 0.08), M.black);
+  beam.position.set(0, 0.18, -0.1);
+  g.add(beam);
+  for (let i = 0; i <= count; i++) {
+    const x = -total / 2 + i * pitch;
+    const arm = mesh(new RoundedBoxGeometry(0.07, 0.62, 0.55, 2, 0.025), M.black);
+    arm.position.set(x, 0.31, -0.02);
+    const armTop = mesh(new RoundedBoxGeometry(0.09, 0.03, 0.5, 2, 0.012), M.wood);
+    armTop.position.set(x, 0.63, 0.0);
+    g.add(arm, armTop);
+  }
+  for (let i = 0; i < count; i++) {
+    const x = -total / 2 + pitch / 2 + i * pitch;
+    const cushion = mesh(new RoundedBoxGeometry(pitch - 0.1, 0.12, 0.48, 3, 0.04), seatMat);
+    cushion.position.set(x, 0.42, 0.04);
+    const back = mesh(new RoundedBoxGeometry(pitch - 0.1, 0.72, 0.12, 3, 0.05), seatMat);
+    back.position.set(x, 0.82, -0.2);
+    back.rotation.x = -0.12;
+    const shell = mesh(new RoundedBoxGeometry(pitch - 0.08, 0.76, 0.06, 2, 0.025), M.black);
+    shell.position.set(x, 0.8, -0.27);
+    shell.rotation.x = -0.12;
+    g.add(cushion, back, shell);
+  }
+  return { group: g, size: { w: total + 0.1, d: 0.7 } };
+}
+
+// ---------------- 빈티지 영화 카메라 소품 ----------------
+export function buildFilmCamera(M) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 3; i++) {
+    const a = (i / 3) * Math.PI * 2 + 0.4;
+    const leg = mesh(new THREE.CylinderGeometry(0.025, 0.018, 1.35, 8), M.woodDark);
+    leg.position.set(Math.cos(a) * 0.32, 0.62, Math.sin(a) * 0.32);
+    leg.rotation.set(Math.sin(a) * 0.25, 0, -Math.cos(a) * 0.25);
+    g.add(leg);
+  }
+  const head = mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.1, 16), M.black);
+  head.position.y = 1.3;
+  const body = mesh(new RoundedBoxGeometry(0.34, 0.36, 0.58, 3, 0.04), M.black);
+  body.position.set(0, 1.55, 0);
+  g.add(head, body);
+  const lens = mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.3, 24), M.black);
+  lens.rotation.x = Math.PI / 2;
+  lens.position.set(0, 1.55, 0.43);
+  const lensRing = mesh(new THREE.TorusGeometry(0.09, 0.012, 8, 24), M.brass);
+  lensRing.position.set(0, 1.55, 0.58);
+  const glass = new THREE.Mesh(new THREE.CircleGeometry(0.07, 24), new THREE.MeshPhysicalMaterial({ color: 0x1a2a3a, roughness: 0.05, metalness: 0.3, clearcoat: 1 }));
+  glass.position.set(0, 1.55, 0.581);
+  g.add(lens, lensRing, glass);
+  // 필름 릴 2개
+  const reels = [];
+  for (const z of [-0.18, 0.2]) {
+    const reel = new THREE.Group();
+    const disc = mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 32), M.brass);
+    disc.rotation.z = Math.PI / 2;
+    reel.add(disc);
+    for (let k = 0; k < 5; k++) {
+      const hole = mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.05, 12), M.black);
+      hole.rotation.z = Math.PI / 2;
+      const a = (k / 5) * Math.PI * 2;
+      hole.position.set(0, Math.cos(a) * 0.12, Math.sin(a) * 0.12);
+      reel.add(hole);
+    }
+    reel.position.set(0, 1.93, z);
+    g.add(reel);
+    reels.push(reel);
+  }
+  const plate = mesh(new THREE.BoxGeometry(0.1, 0.06, 0.4), M.black);
+  plate.position.set(0, 1.75, 0.01);
+  g.add(plate);
+  return { group: g, reels, size: { w: 0.8, d: 0.8 } };
+}
+
+// ---------------- 스탠딩 테이블 ----------------
+export function buildCocktailTable(M) {
+  const g = new THREE.Group();
+  const base = mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.03, 32), M.black);
+  base.position.y = 0.015;
+  const pole = mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.05, 12), M.brass);
+  pole.position.y = 0.55;
+  const top = mesh(new THREE.CylinderGeometry(0.36, 0.36, 0.04, 40), M.marbleWhite);
+  top.position.y = 1.08;
+  const rim = mesh(new THREE.TorusGeometry(0.36, 0.012, 8, 40), M.gold);
+  rim.rotation.x = Math.PI / 2;
+  rim.position.y = 1.08;
+  // 캔들 램프
+  const candle = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.09, 16), new THREE.MeshStandardMaterial({ color: 0xfff2d6, emissive: 0xffb44a, emissiveIntensity: 1.4 }));
+  candle.position.y = 1.145;
+  const glassC = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.13, 16, 1, true), M.glass);
+  glassC.position.y = 1.165;
+  g.add(base, pole, top, rim, candle, glassC);
+  return { group: g, size: { w: 0.75, d: 0.75 } };
+}
+
+// ---------------- 환영 입간판 (A형) ----------------
+export function buildWelcomeSign(M, title) {
+  const g = new THREE.Group();
+  const tex = welcomeTexture(title);
+  const board = mesh(new THREE.BoxGeometry(0.72, 1.0, 0.04), [
+    M.woodDark, M.woodDark, M.woodDark, M.woodDark,
+    new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.15 }),
+    M.woodDark,
+  ]);
+  board.position.set(0, 0.95, 0.12);
+  board.rotation.x = -0.18;
+  const frame = mesh(new THREE.BoxGeometry(0.8, 1.08, 0.03), M.gold);
+  frame.position.set(0, 0.95, 0.1);
+  frame.rotation.x = -0.18;
+  const back = mesh(new THREE.BoxGeometry(0.76, 1.04, 0.03), M.woodDark);
+  back.position.set(0, 0.95, -0.12);
+  back.rotation.x = 0.18;
+  for (const s of [-1, 1]) {
+    for (const z of [0.2, -0.2]) {
+      const leg = mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.5, 6), M.brass);
+      leg.position.set(s * 0.36, 0.23, z);
+      leg.rotation.x = z > 0 ? -0.18 : 0.18;
+      g.add(leg);
+    }
+  }
+  g.add(frame, board, back);
+  return { group: g, size: { w: 0.85, d: 0.6 } };
+}
+
+// ---------------- 명예의 거리 별 타일 ----------------
+let starTex = null;
+export function buildStarTile() {
+  if (!starTex) starTex = starTileTexture();
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshStandardMaterial({ map: starTex, roughness: 0.35, metalness: 0.1 }));
+  m.rotation.x = -Math.PI / 2;
+  m.position.y = 0.015;
+  m.receiveShadow = true;
+  return m;
 }
