@@ -49,46 +49,85 @@ function grain(ctx, w, h, amount, r) {
   }
 }
 
-// 대리석 체크 바닥 (2x2 타일 = 텍스처 1장)
+// 대리석 바닥 — 밝은 아이보리 대형 타일 (텍스처 1장 = 2x2 타일)
+function marbleVeins(ctx, x, y, size, r, color, count) {
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, size, size); ctx.clip();
+  for (let v = 0; v < count; v++) {
+    ctx.strokeStyle = color(r());
+    ctx.lineWidth = 0.4 + r() * 1.6;
+    ctx.beginPath();
+    // 대각선 방향으로 흐르는 부드러운 결
+    let px = x - 40 + r() * size * 0.6, py = y + r() * size;
+    ctx.moveTo(px, py);
+    for (let s = 0; s < 7; s++) {
+      const nx = px + size / 6 + r() * 30, ny = py - size / 10 + (r() - 0.5) * 60;
+      ctx.quadraticCurveTo(px + (nx - px) / 2 + (r() - 0.5) * 40, py + (ny - py) / 2 + (r() - 0.5) * 40, nx, ny);
+      px = nx; py = ny;
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export function marbleTexture() {
   return canvasTexture(1024, 1024, (ctx, w) => {
     const r = rand(11);
     const half = w / 2;
     for (let i = 0; i < 2; i++) {
       for (let j = 0; j < 2; j++) {
-        const light = (i + j) % 2 === 0;
         const x = i * half, y = j * half;
+        // 타일마다 아주 약간씩 다른 톤 (눈에 거슬리지 않을 정도)
+        const t = r() * 0.03;
         const g = ctx.createLinearGradient(x, y, x + half, y + half);
-        if (light) { g.addColorStop(0, '#f5eee3'); g.addColorStop(1, '#e8ddcc'); }
-        else { g.addColorStop(0, '#3a2b2f'); g.addColorStop(1, '#2a1f24'); }
+        g.addColorStop(0, `rgb(${Math.round(244 - t * 120)},${Math.round(238 - t * 120)},${Math.round(228 - t * 120)})`);
+        g.addColorStop(1, `rgb(${Math.round(236 - t * 120)},${Math.round(229 - t * 120)},${Math.round(218 - t * 120)})`);
         ctx.fillStyle = g;
         ctx.fillRect(x, y, half, half);
-        ctx.save();
-        ctx.beginPath(); ctx.rect(x, y, half, half); ctx.clip();
-        for (let v = 0; v < 9; v++) {
-          ctx.strokeStyle = light ? `rgba(140,125,110,${0.07 + r() * 0.13})` : `rgba(210,180,150,${0.05 + r() * 0.1})`;
-          ctx.lineWidth = 0.5 + r() * 2.4;
-          ctx.beginPath();
-          let px = x + r() * half, py = y - 30;
-          ctx.moveTo(px, py);
-          for (let s = 0; s < 6; s++) {
-            const nx = px + (r() - 0.35) * 140, ny = py + half / 5 + r() * 40;
-            ctx.quadraticCurveTo(px + (r() - 0.5) * 90, (py + ny) / 2, nx, ny);
-            px = nx; py = ny;
-          }
-          ctx.stroke();
+        // 은은한 구름 무늬
+        for (let c = 0; c < 18; c++) {
+          const cx = x + r() * half, cy = y + r() * half, rad = 40 + r() * 120;
+          const cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+          cg.addColorStop(0, `rgba(205,192,172,${0.05 + r() * 0.05})`);
+          cg.addColorStop(1, 'rgba(205,192,172,0)');
+          ctx.fillStyle = cg;
+          ctx.fillRect(cx - rad, cy - rad, rad * 2, rad * 2);
         }
-        grain(ctx, half, half, 0, r);
-        for (let s = 0; s < 1400; s++) {
-          ctx.fillStyle = light ? `rgba(0,0,0,${r() * 0.03})` : `rgba(255,255,255,${r() * 0.03})`;
+        marbleVeins(ctx, x, y, half, r, (k) => `rgba(170,152,128,${0.06 + k * 0.1})`, 5);
+        marbleVeins(ctx, x, y, half, r, (k) => `rgba(196,170,120,${0.05 + k * 0.08})`, 2);
+        for (let sp = 0; sp < 900; sp++) {
+          ctx.fillStyle = `rgba(120,100,80,${r() * 0.025})`;
           ctx.fillRect(x + r() * half, y + r() * half, 1.5, 1.5);
         }
-        ctx.restore();
-        ctx.strokeStyle = 'rgba(70,55,40,0.55)';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(x + 1.5, y + 1.5, half - 3, half - 3);
+        // 얇은 줄눈
+        ctx.strokeStyle = 'rgba(170,155,135,0.55)';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(x + 1, y + 1, half - 2, half - 2);
       }
     }
+  });
+}
+
+// 벽 쪽 테두리용 짙은 대리석 (에스프레소 톤 + 금색 줄)
+export function borderMarbleTexture() {
+  return canvasTexture(1024, 128, (ctx, w, h) => {
+    const r = rand(77);
+    const g = ctx.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#3b2d2a'); g.addColorStop(1, '#2f2422');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, w, h);
+    for (let v = 0; v < 14; v++) {
+      ctx.strokeStyle = `rgba(214,190,160,${0.05 + r() * 0.08})`;
+      ctx.lineWidth = 0.5 + r() * 1.2;
+      ctx.beginPath();
+      let px = r() * w, py = 0;
+      ctx.moveTo(px, py);
+      for (let s = 0; s < 4; s++) { px += (r() - 0.3) * 120; py += h / 4; ctx.lineTo(px, py); }
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#c9a14a';
+    ctx.fillRect(0, 10, w, 4);
+    ctx.fillRect(0, h - 14, w, 4);
   });
 }
 
