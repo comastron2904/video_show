@@ -111,9 +111,29 @@ function openOnboarding(current) {
 let world = null;
 let currentFilm = null;
 
+const fsTarget = () => $('playerStage');
+const canFullscreen = () => !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+
+async function toggleFullscreen() {
+  const el = fsTarget();
+  const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+  try {
+    if (isFs) {
+      await (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      await (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      // 안드로이드: 전체화면에서 가로로 돌리기
+      try { await screen.orientation?.lock?.('landscape'); } catch { /* 지원 안 함 */ }
+    }
+  } catch { /* 무시 */ }
+}
+
 function openPlayer(film, demo) {
   if (!film) return;
   world?.setPaused(true);
+  world?.setSuspended?.(true);
+  document.body.classList.add('player-open');
+  $('fullPlayer').hidden = !canFullscreen();
   $('playerTitle').textContent = film.title;
   $('playerMeta').textContent = [film.director, film.runtime].filter(Boolean).join(' · ');
   const frame = $('playerFrame');
@@ -138,8 +158,14 @@ function openPlayer(film, demo) {
 }
 
 function closePlayer() {
+  if (document.fullscreenElement || document.webkitFullscreenElement) {
+    (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)?.catch?.(() => {});
+  }
+  try { screen.orientation?.unlock?.(); } catch { /* 무시 */ }
   $('playerFrame').replaceChildren(); // iframe 제거 → 재생 정지
   $('player').hidden = true;
+  document.body.classList.remove('player-open');
+  world?.setSuspended?.(false);
   world?.setPaused(false);
 }
 
@@ -281,10 +307,12 @@ async function main() {
 
   $('watchBtn').addEventListener('click', () => openPlayer(currentFilm, demo));
   $('closePlayer').addEventListener('click', closePlayer);
+  $('fullPlayer').addEventListener('click', toggleFullscreen);
   $('player').addEventListener('click', (e) => { if (e.target === $('player')) closePlayer(); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('player').hidden) closePlayer(); });
 
   setTimeout(() => $('hint').classList.add('fade'), 9000);
+  if (new URLSearchParams(location.search).has('debug')) window.__openPlayer = (i = 0) => openPlayer(films[i], demo);
 }
 
 main().catch((err) => {
