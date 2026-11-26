@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
-  woodTexture, stripeTexture, signTexture, photoWallTexture, rugTexture, glowTexture, posterTexture, applyThumbnail,
+  woodTexture, stripeTexture, signTexture, photoWallTexture, rugTexture, glowTexture, posterTexture, posterAspect,
   starTileTexture, vintagePosterTexture, welcomeTexture, doorSignTexture, exitSignTexture,
 } from './textures.js';
 
@@ -43,19 +43,22 @@ function mesh(geo, mat, { cast = true, receive = true } = {}) {
 }
 
 // ---------------- 팜플렛 라이트박스 ----------------
-export function buildStand(film, index, eventTitle, M, { withLight = true } = {}) {
+export function buildStand(film, index, eventTitle, M, { withLight = true, scale = 1.6, img = null } = {}) {
   const g = new THREE.Group();
   const accent = new THREE.Color(film.poster_color || '#c0392b');
 
-  // 프레임 크기 (포스터 비율 2:3)
-  const fw = 1.66, fh = 2.4, fd = 0.12;
+  // 프레임 크기: 썸네일 비율에 맞춤 (세로형은 높이 2.4, 가로형은 너비 2.8 기준)
+  const aspect = posterAspect(img);
+  const inner = aspect <= 1 ? { w: 2.26 * aspect, h: 2.26 } : { w: 2.66, h: 2.66 / aspect };
+  const fw = inner.w + 0.14, fh = inner.h + 0.14, fd = 0.12;
   const lift = 0.32;
+  const baseW = fw + 0.2;
 
   // 받침
-  const base = mesh(new RoundedBoxGeometry(1.85, 0.09, 0.72, 3, 0.035), M.black);
+  const base = mesh(new RoundedBoxGeometry(baseW, 0.09, 0.72, 3, 0.035), M.black);
   base.position.y = 0.045;
   g.add(base);
-  for (const sx of [-0.62, 0.62]) {
+  for (const sx of [-baseW * 0.33, baseW * 0.33]) {
     const leg = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.24, 12), M.chrome);
     leg.position.set(sx, 0.2, 0);
     g.add(leg);
@@ -70,7 +73,7 @@ export function buildStand(film, index, eventTitle, M, { withLight = true } = {}
   g.add(back);
 
   // 포스터 (라이트박스: 스스로 빛나는 면)
-  const tex = posterTexture(film, index, eventTitle);
+  const tex = posterTexture(film, index, eventTitle, img);
   const posterMat = new THREE.MeshStandardMaterial({
     map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.6, roughness: 0.3,
   });
@@ -102,7 +105,7 @@ export function buildStand(film, index, eventTitle, M, { withLight = true } = {}
   g.add(ring);
 
   // 포인트 컬러 띠 (받침 앞)
-  const band = mesh(new THREE.BoxGeometry(1.65, 0.022, 0.01), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }), { cast: false });
+  const band = mesh(new THREE.BoxGeometry(baseW - 0.2, 0.022, 0.01), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }), { cast: false });
   band.position.set(0, 0.068, 0.365);
   g.add(band);
 
@@ -114,11 +117,11 @@ export function buildStand(film, index, eventTitle, M, { withLight = true } = {}
     g.add(spot, spot.target);
   }
 
-  // 썸네일이 등록돼 있으면 불러와서 포스터를 교체
-  applyThumbnail(tex, film, index, eventTitle);
+  // 전체 크기 배율 (1.6 → 세로 포스터 약 2.6m × 3.8m, 가로 포스터 약 4.5m × 2.6m)
+  g.scale.setScalar(scale);
 
   const pickables = [frame, poster, back];
-  return { group: g, size: { w: 1.9, d: 0.78 }, frontOffset: 1.2, poster: posterMat, ring: ringMat, glow: glow.material, spot, pickables };
+  return { group: g, size: { w: (baseW + 0.05) * scale, d: 0.78 * scale }, frontOffset: 1.2 * scale, poster: posterMat, ring: ringMat, glow: glow.material, spot, pickables };
 }
 
 // ---------------- 벨벳 차단봉 ----------------
