@@ -399,6 +399,20 @@ export function createWorld(canvas, options) {
     });
   }
 
+  const thumbCache = new Map();
+  function thumbFor(film) {
+    const url = film.thumbnail_url;
+    if (!/^(https?:|blob:)/.test(url || '')) return null;
+    let e = thumbCache.get(url);
+    if (!e) {
+      e = { img: new Image(), ok: false };
+      e.img.onload = () => { e.ok = true; };
+      e.img.src = url;
+      thumbCache.set(url, e);
+    }
+    return e.ok ? e.img : null;
+  }
+
   function drawStand(s, isNear) {
     const c = iso(s.x, s.y);
     const film = s.film;
@@ -446,6 +460,30 @@ export function createWorld(canvas, options) {
     rr(ctx, px, py + bounce, pw, ph, 3); ctx.stroke();
     ctx.strokeStyle = 'rgba(255,255,255,0.25)'; ctx.lineWidth = 1;
     rr(ctx, px + 5, py + 5 + bounce, pw - 10, ph - 10, 2); ctx.stroke();
+
+    const thumbImg = thumbFor(film);
+    if (thumbImg) {
+      ctx.save();
+      rr(ctx, px + 4, py + 4 + bounce, pw - 8, ph - 8, 2); ctx.clip();
+      const iw = thumbImg.naturalWidth, ih = thumbImg.naturalHeight;
+      const sc = Math.max((pw - 8) / iw, (ph - 8) / ih);
+      ctx.drawImage(thumbImg, px + 4 + (pw - 8 - iw * sc) / 2, py + 4 + bounce + (ph - 8 - ih * sc) / 2, iw * sc, ih * sc);
+      const gb = ctx.createLinearGradient(0, py + ph * 0.5, 0, py + ph);
+      gb.addColorStop(0, 'rgba(0,0,0,0)'); gb.addColorStop(1, 'rgba(0,0,0,0.8)');
+      ctx.fillStyle = gb; ctx.fillRect(px, py + ph * 0.5 + bounce, pw, ph * 0.5);
+      ctx.restore();
+      ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 11px Pretendard, "Apple SD Gothic Neo", sans-serif';
+      wrapText(ctx, film.title, pw - 12, 2).forEach((l, i) => ctx.fillText(l, c.x, py + ph - 34 + i * 13 + bounce));
+      state.standRects.push({ x: px - 4, y: py - 4, w: pw + depth + 8, h: ph + bh + 16, stand: s });
+      if (isNear) {
+        const ay = py - 16 + Math.sin(state.time * 5) * 3;
+        ctx.fillStyle = '#ffe28a';
+        ctx.beginPath(); ctx.moveTo(c.x - 7, ay - 6); ctx.lineTo(c.x + 7, ay - 6); ctx.lineTo(c.x, ay + 2); ctx.closePath(); ctx.fill();
+      }
+      return;
+    }
 
     // 필름 아이콘 영역
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
