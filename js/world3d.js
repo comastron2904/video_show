@@ -6,7 +6,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { createAvatar } from './3d/avatar.js';
-import { loadCharacterLibrary, instantiateCharacter, createCharacterPreview } from './3d/characters.js';
+import { loadCharacterLibrary, instantiateCharacter, createCharacterPreview, prefetchCharacters } from './3d/characters.js';
 import { createNavGrid } from './3d/pathfind.js';
 import * as P from './3d/props.js';
 import { loadPosition, autoSavePosition } from './position.js';
@@ -60,7 +60,7 @@ async function loadFonts(texts) {
   if (!document.fonts || !document.fonts.load) return;
   const sample = texts.filter(Boolean).join(' ').slice(0, 2000) || 'A';
   const loads = ['500', '600', '700', '800'].map((w) => document.fonts.load(`${w} 40px "Pretendard Variable"`, sample).catch(() => null));
-  await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 2500))]);
+  await Promise.race([Promise.all(loads), new Promise((r) => setTimeout(r, 1200))]);
 }
 
 // ---------------- 월드 생성 ----------------
@@ -68,17 +68,19 @@ export async function createWorld(canvas, options) {
   const films = options.films || [];
   const isTouch = matchMedia('(pointer: coarse)').matches;
 
-  const [, charLib, thumbImgs] = await Promise.all([
+  // 첫 화면을 빨리 띄우기 위해 꼭 필요한 것만 기다림 (썸네일·다른 캐릭터는 입장 후에 불러옴)
+  const [, charLib] = await Promise.all([
     loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독 1관 2관 비상구 시사회에 오신 것을 환영합니다 팜플렛 앞에서 시청하기를 눌러 작품을 감상하세요 은막의 밤 자정의 필름 마지막 장면 별빛 극장 개봉 첫날 시네마 천국 황금시대 조명 카메라']),
     loadCharacterLibrary(),
-    Promise.all(films.map((f) => loadThumbnail(f.thumbnail_url))), // 썸네일 비율로 팜플렛 모양 결정
   ]);
-  const makeAvatar = (look) => {
-    const a = charLib ? instantiateCharacter(charLib, look.seed || 0) : createAvatar(look);
+  const makeAvatar = async (look) => {
+    const a = (charLib && (await instantiateCharacter(charLib, look.seed || 0))) || createAvatar(look);
     a.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); // 그림자는 발밑 원형 그림자로
     return a;
   };
+  const firstAvatar = makeAvatar(options.look); // 내 캐릭터 모델 1개만 미리 받기 시작
   let preview = null;
+  let lookToken = 0;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   let pixelRatio = Math.min(window.devicePixelRatio || 1, isTouch ? 1.25 : 1.5);
@@ -126,7 +128,7 @@ export async function createWorld(canvas, options) {
   key.position.set(center.x - 7, 15, center.z + 9);
   key.target.position.copy(center);
   key.castShadow = true;
-  const SHADOW_MAP = isTouch ? 2048 : 4096;
+  const SHADOW_MAP = isTouch ? 1024 : 2048;
   key.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
   const ext = Math.max(W, D) * 0.75; // 홀 전체 (그림자는 처음에 한 번만 계산)
   Object.assign(key.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 1, far: 50 });
@@ -373,10 +375,11 @@ export async function createWorld(canvas, options) {
   // ---------------- 팜플렛 ----------------
   const stands = L.stands.map((s) => {
     const film = films[s.index];
-    const built = P.buildStand(film, s.index, options.title, M, { withLight: false, img: thumbImgs[s.index] });
+    const built = P.buildStand(film, s.index, options.title, M, { withLight: false });
+    const colliderIdx = colliders.length;
     place(built, s.x, s.z, 0);
     built.pickables.forEach((m) => { m.userData.stand = s.index; });
-    return { ...s, film, built, front: { x: s.x, z: s.z + (built.frontOffset || 0.95) }, glowT: 0 };
+    return { ...s, film, built, colliderIdx, front: { x: s.x, z: s.z + (built.frontOffset || 0.95) }, glowT: 0 };
   });
   const pickables = stands.flatMap((s) => s.built.pickables);
 
@@ -390,10 +393,33 @@ export async function createWorld(canvas, options) {
   renderer.shadowMap.autoUpdate = false;
   renderer.shadowMap.needsUpdate = true;
 
-  const nav = createNavGrid(W, D, colliders, { radius: P_RADIUS + 0.05 });
+  let nav = createNavGrid(W, D, colliders, { radius: P_RADIUS + 0.05 });
+
+  // 썸네일은 입장 후에 불러와서, 받는 대로 그 팜플렛만 썸네일 비율로 다시 만듦
+  function applyStandThumbnail(st, img) {
+    scene.remove(st.built.group);
+    const built = P.buildStand(st.film, st.index, options.title, M, { withLight: false, img });
+    built.group.position.set(st.x, 0, st.z);
+    scene.add(built.group);
+    built.pickables.forEach((m) => { m.userData.stand = st.index; });
+    const w = built.size.w, d = built.size.d;
+    colliders[st.colliderIdx] = { x0: st.x - w / 2, x1: st.x + w / 2, z0: st.z - d / 2, z1: st.z + d / 2 };
+    st.built = built;
+    st.front.z = st.z + (built.frontOffset || 0.95);
+    pickables.length = 0;
+    stands.forEach((x) => pickables.push(...x.built.pickables));
+    nav = createNavGrid(W, D, colliders, { radius: P_RADIUS + 0.05 });
+    renderer.shadowMap.needsUpdate = true;
+  }
+  function loadStandThumbnails() {
+    for (const st of stands) {
+      if (!st.film.thumbnail_url) continue;
+      loadThumbnail(st.film.thumbnail_url).then((img) => { if (img) applyStandThumbnail(st, img); });
+    }
+  }
 
   // ---------------- 캐릭터 ----------------
-  let avatar = makeAvatar(options.look);
+  let avatar = await firstAvatar;
   scene.add(avatar.root);
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.9), new THREE.MeshBasicMaterial({ map: softShadowTexture(), transparent: true, depthWrite: false, opacity: 0.7 }));
   blob.rotation.x = -Math.PI / 2;
@@ -779,6 +805,11 @@ export async function createWorld(canvas, options) {
   }
   raf = requestAnimationFrame(loop);
   autoSavePosition(POS_KEY, () => player);
+  // 첫 화면이 뜬 뒤: 썸네일 불러오기 + 다시 뽑기용 캐릭터 몇 개 미리 받기
+  setTimeout(() => {
+    loadStandThumbnails();
+    if (charLib) prefetchCharacters(charLib, [1, 2, 3, 4, 5, 6].map((k) => (options.look.seed || 0) + k));
+  }, 300);
 
   if (new URLSearchParams(location.search).has('debug')) {
     window.__premiereDebug = { layout: L, colliders, nav, stands, player, blocked };
@@ -787,11 +818,15 @@ export async function createWorld(canvas, options) {
   return {
     mode: '3d',
     setLook(look, nickname) {
-      scene.remove(avatar.root);
-      avatar = makeAvatar(look);
-      scene.add(avatar.root);
       tag.textContent = nickname || '';
       tag.hidden = !nickname;
+      const token = (lookToken = (lookToken || 0) + 1);
+      makeAvatar(look).then((a) => {
+        if (token !== lookToken) return; // 그 사이 다시 바뀌었으면 무시
+        scene.remove(avatar.root);
+        avatar = a;
+        scene.add(avatar.root);
+      });
     },
     // 영상 재생 중에는 화면 그리기를 멈춰 휴대폰 성능을 영상에 양보
     setSuspended(v) {
