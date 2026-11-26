@@ -754,7 +754,9 @@ export async function createWorld(canvas, options) {
   let last = performance.now();
   let slowTime = 0, degraded = false;
   let raf = 0;
+  let suspended = false;
   function loop(now) {
+    if (suspended) { raf = 0; return; }
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     time += dt;
@@ -790,6 +792,12 @@ export async function createWorld(canvas, options) {
       scene.add(avatar.root);
       tag.textContent = nickname || '';
       tag.hidden = !nickname;
+    },
+    // 영상 재생 중에는 화면 그리기를 멈춰 휴대폰 성능을 영상에 양보
+    setSuspended(v) {
+      if (v === suspended) return;
+      suspended = v;
+      if (!v && !raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
     },
     setPaused(p) {
       paused = p;
