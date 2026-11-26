@@ -190,11 +190,21 @@ function normalizeImageUrl(raw) {
 
 function showThumbPreview(url) {
   const el = $('thumbPreview');
+  el.style.aspectRatio = '';
   if (url) {
     el.style.backgroundImage = `url("${encodeURI(url)}")`;
     el.classList.add('has-img');
+    // 미리보기 칸도 썸네일 비율(가로/세로)에 맞춤
+    const probe = new Image();
+    probe.onload = () => {
+      const a = Math.max(0.5, Math.min(2, probe.naturalWidth / probe.naturalHeight));
+      el.style.aspectRatio = String(a);
+      el.style.width = a > 1 ? '180px' : '120px';
+    };
+    probe.src = url;
   } else {
     el.style.backgroundImage = '';
+    el.style.width = '';
     el.classList.remove('has-img');
   }
 }
