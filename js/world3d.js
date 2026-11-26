@@ -26,19 +26,21 @@ const CAM_EL = 0.74;        // 카메라 고도각 (약 42°)
 const MAX_SPOTS = 12;
 
 // ---------------- 레이아웃 ----------------
+// 홀 크기는 상영작 수와 상관없이 고정 (작품이 아주 많을 때만 세로로 늘어남)
+export const HALL_W = 40;
+export const HALL_D = 32;
+
 export function computeLayout(n) {
   const count = Math.max(0, n);
-  const cols = count <= 4 ? 2 : 4;
-  const slots = cols === 4 ? [-5.7, -2.5, 2.5, 5.7] : [-2.5, 2.5];
-  const partialOrder = cols === 4 ? [1, 2, 0, 3] : [0, 1];
+  const cols = 4;
+  const slots = [-10.5, -5, 5, 10.5];          // 레드카펫 기준 팜플렛 가로 위치
+  const partialOrder = [1, 2, 0, 3];           // 한 줄이 덜 찼을 때 카펫 가까운 쪽부터
   const rows = Math.max(1, Math.ceil(count / cols));
-  const leftZone = 7.2;
-  const bankHalf = cols === 4 ? 7.3 : 4.3;
-  const ax = leftZone + bankHalf;
-  const W = ax + bankHalf + 0.8;
-  const z0 = 3.6, rowGap = 3.7;
+  const ax = 23;                               // 레드카펫 중심
+  const W = HALL_W;
+  const z0 = 5, rowGap = 5;
   const standEnd = z0 + (rows - 1) * rowGap;
-  const D = Math.max(18, standEnd + 8.5);
+  const D = Math.max(HALL_D, standEnd + 11);
 
   const stands = [];
   for (let r = 0; r < rows; r++) {
@@ -244,9 +246,11 @@ export async function createWorld(canvas, options) {
   place(P.buildPlant(M, 0.85), 5.6, lz - 1.9, 0);
 
   // ---------------- 벨벳 차단봉 (입구 런웨이) ----------------
-  const zR0 = L.standEnd + 2.1, zR1 = D - 0.6;
+  // 차단봉은 입구 쪽에만 짧게 (약 4m)
+  const ROPE_LEN = 4.0;
+  const zR1 = D - 0.6, zR0 = Math.max(L.standEnd + 2.1, zR1 - ROPE_LEN);
   if (zR1 - zR0 > 1.5) {
-    const n = Math.max(2, Math.round((zR1 - zR0) / 1.9) + 1);
+    const n = Math.max(2, Math.round((zR1 - zR0) / 2.0) + 1);
     for (const s of [-1, 1]) {
       const x = ax + s * 1.3;
       let prev = null;
