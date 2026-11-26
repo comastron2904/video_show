@@ -580,7 +580,9 @@ export function createWorld(canvas, options) {
 
   let last = performance.now();
   let raf = 0;
+  let suspended = false;
   function loop(now) {
+    if (suspended) { raf = 0; return; }
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     state.time += dt;
@@ -605,6 +607,11 @@ export function createWorld(canvas, options) {
     setLook(look, nickname) { state.look = look; state.nickname = nickname; },
     setTitle(t) { state.title = t; },
     setRunning(v) { state.run = !!v; },
+    setSuspended(v) {
+      if (v === suspended) return;
+      suspended = v;
+      if (!v && !raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
+    },
     setPaused(p) { state.paused = p; state.keys.clear(); if (p) state.target = null; },
     activateNear() { if (state.near) options.onActivate?.(state.near.film); },
     destroy() { cancelAnimationFrame(raf); },
