@@ -207,7 +207,7 @@ body.touch .hint-desktop { display: none; }
   background: #000; border-radius: 14px; overflow: hidden;
   box-shadow: 0 0 0 1px var(--line), 0 30px 90px rgba(0,0,0,.6);
 }
-.player-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.player-frame iframe { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border: 0; transform-origin: 0 0; }
 .player-foot { margin: 10px 0 0; font-size: 12px; color: var(--muted); text-align: right; }
 .player-foot a { color: var(--gold); }
 .player-foot a:not([href]) { pointer-events: none; opacity: .5; }
@@ -229,8 +229,8 @@ body.player-open .hint, body.player-open .name-tag3d { visibility: hidden; }
   }
   .player-head { margin-bottom: 10px; align-items: center; }
   .player-head h2 { font-size: 17px; }
-  .player-stage { flex: 1; border-radius: 0; margin: 0 calc(-1 * max(12px, env(safe-area-inset-left))); }
-  .player-frame { border-radius: 0; box-shadow: none; max-width: 100%; }
+  .player-stage { flex: 1; min-height: 0; border-radius: 0; margin: 0 calc(-1 * max(12px, env(safe-area-inset-left))); align-items: stretch; }
+  .player-frame { border-radius: 0; box-shadow: none; max-width: none; aspect-ratio: auto; width: 100%; height: 100%; }
   .player-foot { text-align: center; }
 }
 
@@ -238,11 +238,12 @@ body.player-open .hint, body.player-open .name-tag3d { visibility: hidden; }
 @media (max-height: 500px) and (orientation: landscape) {
   #player.modal { padding: 0; place-items: stretch; }
   .player-card { width: 100%; height: 100dvh; position: relative; display: flex; }
-  .player-head { position: absolute; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); z-index: 2; margin: 0; }
+  .player-head { position: absolute; top: max(8px, env(safe-area-inset-top)); left: max(8px, env(safe-area-inset-left)); z-index: 2; margin: 0; }
+  .player-actions { flex-direction: row-reverse; }
   .player-head > div:first-child { display: none; }
   .player-actions .icon-btn { background: rgba(0,0,0,.55); }
-  .player-stage { flex: 1; border-radius: 0; }
-  .player-frame { max-width: calc(100dvh * 16 / 9); border-radius: 0; box-shadow: none; }
+  .player-stage { flex: 1; min-height: 0; border-radius: 0; align-items: stretch; }
+  .player-frame { max-width: none; aspect-ratio: auto; width: 100%; height: 100%; border-radius: 0; box-shadow: none; }
   .player-foot { display: none; }
 }
 
