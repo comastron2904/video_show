@@ -42,22 +42,35 @@ async function resolveFileList() {
   return KENNEY_DEFAULT;
 }
 
+// 목록(list.json)만 먼저 읽고, 모델 파일은 실제로 필요할 때 하나씩 불러옵니다.
+// (예전에는 13개를 모두 받은 뒤에 입장해서 첫 로딩이 오래 걸렸음)
+const gltfCache = new Map();
+let loader = null;
+function loadModel(file) {
+  if (!gltfCache.has(file)) {
+    loader = loader || new GLTFLoader();
+    gltfCache.set(file, loader.loadAsync(BASE + file).catch((e) => {
+      console.info('[premiere] 캐릭터 모델을 불러오지 못했습니다:', file, e?.message || e);
+      return null;
+    }));
+  }
+  return gltfCache.get(file);
+}
+
 export function loadCharacterLibrary() {
   if (libraryPromise) return libraryPromise;
   libraryPromise = (async () => {
     const files = await resolveFileList();
-    const loader = new GLTFLoader();
-    const settled = await Promise.all(files.map((file) =>
-      loader.loadAsync(BASE + file).then((gltf) => ({ file, gltf })).catch(() => null)));
-    const list = settled.filter(Boolean);
-    if (!list.length) {
-      console.info('[premiere] /models/characters/ 에서 캐릭터 모델을 찾지 못해 기본 캐릭터를 사용합니다.');
-      return null;
-    }
-    console.info(`[premiere] 캐릭터 모델 ${list.length}개 불러옴:`, list.map((e) => e.file).join(', '));
-    return { list };
+    return files.length ? { files } : null;
   })();
   return libraryPromise;
+}
+
+const fileFor = (lib, seed) => lib.files[Math.abs(seed | 0) % lib.files.length];
+
+// 다음에 쓸 만한 모델을 미리 받아 두기 (다시 뽑기 때 빠르게)
+export function prefetchCharacters(lib, seeds) {
+  for (const sd of seeds) loadModel(fileFor(lib, sd));
 }
 
 function findClip(clips, patterns, avoid = /wheelchair|chair|sit/i) {
@@ -68,9 +81,12 @@ function findClip(clips, patterns, avoid = /wheelchair|chair|sit/i) {
   return null;
 }
 
-// 닉네임으로 정해진 seed 로 모델 하나를 골라 새 인스턴스를 만듭니다.
-export function instantiateCharacter(lib, seed) {
-  const entry = lib.list[Math.abs(seed | 0) % lib.list.length];
+// 닉네임으로 정해진 seed 로 모델 하나를 골라 새 인스턴스를 만듭니다. (불러오기 실패 시 null)
+export async function instantiateCharacter(lib, seed) {
+  const file = fileFor(lib, seed);
+  const gltf = await loadModel(file);
+  if (!gltf) return null;
+  const entry = { file, gltf };
   const model = SkeletonUtils.clone(entry.gltf.scene);
 
   model.traverse((o) => {
@@ -171,31 +187,48 @@ export function createCharacterPreview(lib) {
     }
   }
 
+  let wanted = null;
   function setSeed(s) {
-    if (s === seed && current) return;
-    seed = s;
-    if (current) scene.remove(current.root);
-    current = instantiateCharacter(lib, s);
-    current.root.rotation.y = -0.35;
-    scene.add(current.root);
+    if (s === wanted) return;
+    wanted = s;
+    instantiateCharacter(lib, s).then((inst) => {
+      if (wanted !== s || !inst) return;
+      if (current) scene.remove(current.root);
+      current = inst;
+      current.root.rotation.y = -0.35;
+      scene.add(current.root);
+      seed = s;
+    });
   }
 
   return {
     canvas,
     render(s, dt = 0, mode = 'full', spin = 0) {
       setSeed(s);
-      current.update(dt, false);
-      current.root.rotation.y = -0.35 + spin;
+      if (current) {
+        current.update(dt, false);
+        current.root.rotation.y = -0.35 + spin;
+      }
       frame(mode);
       renderer.render(scene, camera);
     },
-    snapshot(s) {
-      setSeed(s);
-      current.update(0.016, false);
-      current.root.rotation.y = -0.25;
+    // 프로필용 얼굴 사진 (모델이 준비될 때까지 기다림, 실패하면 null)
+    async snapshot(s) {
+      const inst = await instantiateCharacter(lib, s);
+      if (!inst) return null;
+      const prev = current;
+      if (prev) scene.remove(prev.root);
+      scene.add(inst.root);
+      inst.update(0.016, false);
+      inst.root.rotation.y = -0.25;
+      const keep = current; current = inst;
       frame('face');
       renderer.render(scene, camera);
-      return canvas.toDataURL('image/png');
+      const url = canvas.toDataURL('image/png');
+      scene.remove(inst.root);
+      current = keep;
+      if (keep) scene.add(keep.root);
+      return url;
     },
   };
 }
