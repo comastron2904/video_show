@@ -14,7 +14,7 @@ import { bakeStatic, stripDecorLights } from './3d/bake.js';
 
 const POS_KEY = 'premiere.pos3d.v1';
 import {
-  marbleTexture, carpetTexture, wallpaperTexture, marqueeTexture, softShadowTexture, setMaxAnisotropy,
+  marbleTexture, borderMarbleTexture, carpetTexture, wallpaperTexture, marqueeTexture, softShadowTexture, setMaxAnisotropy,
 } from './3d/textures.js';
 
 const WALL_H = 4.2;
@@ -155,12 +155,30 @@ export async function createWorld(canvas, options) {
   // ---------------- 바닥 / 벽 ----------------
   const marble = marbleTexture();
   marble.wrapS = marble.wrapT = THREE.RepeatWrapping;
-  marble.repeat.set(W / 2, D / 2);
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: marble, roughness: 0.3, metalness: 0 }));
+  marble.repeat.set(W / 3, D / 3); // 타일 한 장 = 1.5m
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: marble, roughness: 0.32, metalness: 0 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(W / 2, 0, D / 2);
   floor.receiveShadow = true;
   scene.add(floor);
+
+  // 벽을 따라 두르는 짙은 대리석 띠 (뒷벽 · 왼쪽 벽)
+  const borderMat = (len) => {
+    const t = borderMarbleTexture();
+    t.wrapS = THREE.RepeatWrapping;
+    t.repeat.set(len / 6, 1);
+    return new THREE.MeshStandardMaterial({ map: t, roughness: 0.25 });
+  };
+  const bandW = 0.6, inset = 0.25;
+  const backBand = new THREE.Mesh(new THREE.PlaneGeometry(W - inset, bandW), borderMat(W));
+  backBand.rotation.x = -Math.PI / 2;
+  backBand.position.set(inset + (W - inset) / 2, 0.006, inset + bandW / 2);
+  const leftBand = new THREE.Mesh(new THREE.PlaneGeometry(D - inset - bandW - inset, bandW), borderMat(D));
+  leftBand.rotation.x = -Math.PI / 2;
+  leftBand.rotation.z = Math.PI / 2;
+  leftBand.position.set(inset + bandW / 2, 0.006, inset + bandW + (D - inset - bandW - inset) / 2);
+  backBand.receiveShadow = leftBand.receiveShadow = true;
+  scene.add(backBand, leftBand);
 
   const slab = new THREE.Mesh(new THREE.BoxGeometry(W, 0.4, D), new THREE.MeshStandardMaterial({ color: 0x1a1016, roughness: 0.8 }));
   slab.position.set(W / 2, -0.201, D / 2);
