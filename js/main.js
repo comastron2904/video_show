@@ -128,6 +128,21 @@ async function toggleFullscreen() {
   } catch { /* 무시 */ }
 }
 
+// 구글 드라이브 플레이어는 높이가 낮으면 버튼이 잘려서, 최소 높이를 확보한 뒤 화면에 맞게 축소
+const PLAYER_MIN_H = 480;
+let fitObserver = null;
+function fitIframe() {
+  const frame = $('playerFrame');
+  const iframe = frame.querySelector('iframe');
+  if (!iframe) return;
+  const w = frame.clientWidth, h = frame.clientHeight;
+  if (!w || !h) return;
+  const s = Math.min(1, h / PLAYER_MIN_H);
+  iframe.style.width = `${w / s}px`;
+  iframe.style.height = `${h / s}px`;
+  iframe.style.transform = s < 1 ? `scale(${s})` : '';
+}
+
 function openPlayer(film, demo) {
   if (!film) return;
   world?.setPaused(true);
@@ -151,9 +166,12 @@ function openPlayer(film, demo) {
     iframe.allowFullscreen = true;
     iframe.title = film.title;
     frame.appendChild(iframe);
+    if (!fitObserver && 'ResizeObserver' in window) fitObserver = new ResizeObserver(fitIframe);
+    fitObserver?.observe(frame);
     $('driveLink').href = driveViewUrl(film.file_id);
   }
   $('player').hidden = false;
+  requestAnimationFrame(fitIframe);
   $('closePlayer').focus();
 }
 
@@ -162,6 +180,7 @@ function closePlayer() {
     (document.exitFullscreen || document.webkitExitFullscreen)?.call(document)?.catch?.(() => {});
   }
   try { screen.orientation?.unlock?.(); } catch { /* 무시 */ }
+  fitObserver?.disconnect();
   $('playerFrame').replaceChildren(); // iframe 제거 → 재생 정지
   $('player').hidden = true;
   document.body.classList.remove('player-open');
@@ -310,9 +329,10 @@ async function main() {
   $('fullPlayer').addEventListener('click', toggleFullscreen);
   $('player').addEventListener('click', (e) => { if (e.target === $('player')) closePlayer(); });
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('player').hidden) closePlayer(); });
+  window.addEventListener('orientationchange', () => setTimeout(fitIframe, 300));
 
   setTimeout(() => $('hint').classList.add('fade'), 9000);
-  if (new URLSearchParams(location.search).has('debug')) window.__openPlayer = (i = 0) => openPlayer(films[i], demo);
+  if (new URLSearchParams(location.search).has('debug')) window.__openPlayer = (i = 0, real = false) => openPlayer(real ? { ...films[i], file_id: 'TESTFILEID1234567890abcd' } : films[i], real ? false : demo);
 }
 
 main().catch((err) => {
