@@ -10,6 +10,7 @@ import { loadCharacterLibrary, instantiateCharacter, createCharacterPreview } fr
 import { createNavGrid } from './3d/pathfind.js';
 import * as P from './3d/props.js';
 import { loadPosition, autoSavePosition } from './position.js';
+import { bakeStatic, stripDecorLights } from './3d/bake.js';
 
 const POS_KEY = 'premiere.pos3d.v1';
 import {
@@ -71,11 +72,15 @@ export async function createWorld(canvas, options) {
     loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독 1관 2관 비상구 시사회에 오신 것을 환영합니다 팜플렛 앞에서 시청하기를 눌러 작품을 감상하세요 은막의 밤 자정의 필름 마지막 장면 별빛 극장 개봉 첫날 시네마 천국 황금시대 조명 카메라']),
     loadCharacterLibrary(),
   ]);
-  const makeAvatar = (look) => (charLib ? instantiateCharacter(charLib, look.seed || 0) : createAvatar(look));
+  const makeAvatar = (look) => {
+    const a = charLib ? instantiateCharacter(charLib, look.seed || 0) : createAvatar(look);
+    a.root.traverse((o) => { if (o.isMesh) o.castShadow = false; }); // 그림자는 발밑 원형 그림자로
+    return a;
+  };
   let preview = null;
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
-  let pixelRatio = Math.min(window.devicePixelRatio || 1, isTouch ? 1.5 : 2);
+  let pixelRatio = Math.min(window.devicePixelRatio || 1, isTouch ? 1.25 : 1.5);
   renderer.setPixelRatio(pixelRatio);
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -90,7 +95,7 @@ export async function createWorld(canvas, options) {
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.32;
+  scene.environmentIntensity = 0.5;
   pmrem.dispose();
 
   const M = P.createMaterials();
@@ -112,17 +117,17 @@ export async function createWorld(canvas, options) {
   }
 
   // ---------------- 조명 ----------------
-  const hemi = new THREE.HemisphereLight(0xffe6cc, 0x2a1530, 0.55);
+  const hemi = new THREE.HemisphereLight(0xffe6cc, 0x2a1530, 0.95);
   scene.add(hemi);
 
   const center = new THREE.Vector3(W / 2, 0, D / 2);
-  const key = new THREE.DirectionalLight(0xffdcb8, 1.7);
+  const key = new THREE.DirectionalLight(0xffdcb8, 2.1);
   key.position.set(center.x - 7, 15, center.z + 9);
   key.target.position.copy(center);
   key.castShadow = true;
-  const SHADOW_MAP = isTouch ? 1024 : 2048;
+  const SHADOW_MAP = isTouch ? 2048 : 4096;
   key.shadow.mapSize.set(SHADOW_MAP, SHADOW_MAP);
-  const ext = 16; // 플레이어 주변 반경 16m 만 그림자 계산 (넓은 홀에서도 선명하게)
+  const ext = Math.max(W, D) * 0.75; // 홀 전체 (그림자는 처음에 한 번만 계산)
   Object.assign(key.shadow.camera, { left: -ext, right: ext, top: ext, bottom: -ext, near: 1, far: 50 });
   key.shadow.camera.updateProjectionMatrix();
   key.shadow.bias = -0.0005;
@@ -349,12 +354,22 @@ export async function createWorld(canvas, options) {
   // ---------------- 팜플렛 ----------------
   const stands = L.stands.map((s) => {
     const film = films[s.index];
-    const built = P.buildStand(film, s.index, options.title, M, { withLight: films.length <= MAX_SPOTS && !isTouch });
+    const built = P.buildStand(film, s.index, options.title, M, { withLight: false });
     place(built, s.x, s.z, 0);
     built.pickables.forEach((m) => { m.userData.stand = s.index; });
     return { ...s, film, built, front: { x: s.x, z: s.z + 0.95 }, glowT: 0 };
   });
   const pickables = stands.flatMap((s) => s.built.pickables);
+
+  // ---------------- 성능 최적화 ----------------
+  // 1) 장식용 조명 제거 (조명이 많을수록 화면 전체가 느려짐 → 발광 재질과 기본 조명으로 대체)
+  const removedLights = stripDecorLights(scene);
+  // 2) 움직이지 않는 물체를 재질별로 합치기 (팜플렛·회전하는 릴은 제외)
+  const baked = bakeStatic(scene, new Set([...stands.map((s) => s.built.group), ...filmCam.reels]));
+  console.info(`[premiere] 최적화: 조명 ${removedLights}개 제거, 메시 ${baked.before}개 → ${baked.after}개`);
+  // 3) 그림자는 처음 한 번만 계산 (캐릭터는 발밑 그림자 사용)
+  renderer.shadowMap.autoUpdate = false;
+  renderer.shadowMap.needsUpdate = true;
 
   const nav = createNavGrid(W, D, colliders, { radius: P_RADIUS + 0.05 });
 
@@ -389,11 +404,12 @@ export async function createWorld(canvas, options) {
   const camTarget = new THREE.Vector3(player.x, 0.9, player.z);
   const camDir = new THREE.Vector3(Math.sin(CAM_AZ) * Math.cos(CAM_EL), Math.sin(CAM_EL), Math.cos(CAM_AZ) * Math.cos(CAM_EL));
 
-  const msaa = renderer.capabilities.isWebGL2 !== false ? (isTouch ? 2 : 4) : 0;
+  const msaa = renderer.capabilities.isWebGL2 !== false && !isTouch ? 4 : 0;
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: msaa }));
   composer.addPass(new RenderPass(scene, camera));
   const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.45, 1.0);
   composer.addPass(bloom);
+  if (isTouch) bloom.enabled = false; // 모바일은 빛 번짐 효과 끔 (성능)
   composer.addPass(new OutputPass());
 
   function resize() {
@@ -683,7 +699,6 @@ export async function createWorld(canvas, options) {
     camTarget.z += (player.z - camTarget.z) * k;
     camera.position.copy(camTarget).addScaledVector(camDir, dist);
     camera.lookAt(camTarget);
-    followShadow(camTarget);
   }
 
   function updateTag() {
@@ -730,8 +745,8 @@ export async function createWorld(canvas, options) {
 
     // 느린 기기 자동 품질 조절
     if (!degraded && time > 3) {
-      slowTime = dt > 0.04 ? slowTime + dt : Math.max(0, slowTime - dt);
-      if (slowTime > 2) {
+      slowTime = dt > 0.028 ? slowTime + dt : Math.max(0, slowTime - dt * 0.5);
+      if (slowTime > 1.5) {
         degraded = true;
         pixelRatio = 1;
         renderer.setPixelRatio(1);
