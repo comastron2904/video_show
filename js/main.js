@@ -143,15 +143,36 @@ function closePlayer() {
   world?.setPaused(false);
 }
 
+const ratioCache = new Map();
+function thumbRatio(url) {
+  if (ratioCache.has(url)) return ratioCache.get(url);
+  const p = new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(Math.max(0.5, Math.min(2, img.naturalWidth / img.naturalHeight)));
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+  ratioCache.set(url, p);
+  return p;
+}
+
 function showNear(film) {
   currentFilm = film;
   const card = $('nearCard');
   $('hint').hidden = !!film;
   if (!film) { card.hidden = true; return; }
   const thumb = $('nearColor');
+  thumb.classList.remove('landscape');
+  thumb.style.aspectRatio = '';
   if (/^(https?:|blob:)/.test(film.thumbnail_url || '')) {
     thumb.style.background = `${film.poster_color || '#c0392b'} url("${encodeURI(film.thumbnail_url)}") center / cover no-repeat`;
     thumb.classList.add('has-img');
+    // 썸네일 비율에 맞춰 카드 속 미리보기도 가로/세로로
+    thumbRatio(film.thumbnail_url).then((ratio) => {
+      if (currentFilm !== film || !ratio) return;
+      thumb.style.aspectRatio = String(ratio);
+      thumb.classList.toggle('landscape', ratio > 1);
+    });
   } else {
     thumb.style.background = film.poster_color || '#c0392b';
     thumb.classList.remove('has-img');
