@@ -447,8 +447,14 @@ function drawGeneratedPoster(ctx, w, h, film, index, eventTitle) {
     grain(ctx, w, h, 9000, r);
   }
 
-function drawPoster(ctx, film, index, eventTitle, img) {
-  const w = 600, h = 900;
+// 포스터 비율: 썸네일이 있으면 썸네일 비율(세로 1:2 ~ 가로 2:1 사이), 없으면 세로 2:3
+export function posterAspect(img) {
+  if (!img) return 2 / 3;
+  const a = (img.naturalWidth || img.width) / (img.naturalHeight || img.height);
+  return Math.max(0.5, Math.min(2, a || 2 / 3));
+}
+
+function drawPoster(ctx, film, index, eventTitle, img, w, h) {
   ctx.save();
   ctx.setTransform(POSTER_SCALE, 0, 0, POSTER_SCALE, 0, 0);
   ctx.clearRect(0, 0, w, h);
@@ -457,30 +463,29 @@ function drawPoster(ctx, film, index, eventTitle, img) {
   ctx.restore();
 }
 
-export function posterTexture(film, index, eventTitle) {
-  return canvasTexture(600 * POSTER_SCALE, 900 * POSTER_SCALE, (ctx) => drawPoster(ctx, film, index, eventTitle, null));
+// 짧은 변을 600 으로 두고 비율에 맞춘 포스터 캔버스
+export function posterTexture(film, index, eventTitle, img = null) {
+  const aspect = posterAspect(img);
+  const w = aspect <= 1 ? 600 : Math.round(600 * aspect);
+  const h = aspect <= 1 ? Math.round(600 / aspect) : 600;
+  return canvasTexture(w * POSTER_SCALE, h * POSTER_SCALE, (ctx) => drawPoster(ctx, film, index, eventTitle, img, w, h));
 }
 
-// 썸네일 이미지를 불러와 포스터 텍스처를 다시 그림 (실패하면 기존 포스터 유지)
-export function applyThumbnail(texture, film, index, eventTitle) {
-  const url = String(film.thumbnail_url || '').trim();
-  if (!/^https?:\/\//i.test(url) && !url.startsWith('blob:')) return Promise.resolve(false);
+// 썸네일 이미지 불러오기 (CORS 허용 안 되거나 실패하면 null → 자동 포스터)
+export function loadThumbnail(url, timeoutMs = 6000) {
+  const u = String(url || '').trim();
+  if (!/^https?:\/\//i.test(u) && !u.startsWith('blob:')) return Promise.resolve(null);
   return new Promise((resolve) => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        drawPoster(texture.image.getContext('2d'), film, index, eventTitle, img);
-        texture.needsUpdate = true;
-        resolve(true);
-      } catch (e) {
-        console.warn('[premiere] 썸네일을 포스터에 그릴 수 없습니다 (이미지 서버가 CORS 를 허용하지 않음):', url);
-        drawPoster(texture.image.getContext('2d'), film, index, eventTitle, null);
-        resolve(false);
-      }
+    const timer = setTimeout(() => { img.src = ''; resolve(null); }, timeoutMs);
+    img.onload = () => { clearTimeout(timer); resolve(img); };
+    img.onerror = () => {
+      clearTimeout(timer);
+      console.warn('[premiere] 썸네일을 불러오지 못했습니다 (주소 또는 CORS 문제):', u);
+      resolve(null);
     };
-    img.onerror = () => { console.warn('[premiere] 썸네일을 불러오지 못했습니다:', url); resolve(false); };
-    img.src = url;
+    img.src = u;
   });
 }
 
