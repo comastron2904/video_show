@@ -115,6 +115,35 @@ body.touch .hint-desktop { display: none; }
   background: linear-gradient(180deg, var(--gold-2), var(--gold)); color: #2a1606; border-color: transparent;
 }
 
+/* ---------- 인기투표 ---------- */
+.vote-btn { bottom: calc(max(24px, env(safe-area-inset-bottom)) + 60px); }
+.vote-btn.voted { opacity: .85; }
+.modal-card.vote-card { width: min(520px, 100%); text-align: left; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; }
+.vote-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 14px; }
+.vote-head h2 { margin: 0 0 4px; }
+.vote-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; overflow: auto; flex: 1; min-height: 0; }
+.vote-item {
+  display: flex; align-items: center; gap: 12px; padding: 10px; border-radius: 12px; cursor: pointer;
+  background: rgba(255,255,255,.04); border: 1.5px solid rgba(255,255,255,.08);
+  transition: border-color .15s, background .15s;
+}
+.vote-item:hover { background: rgba(255,255,255,.07); }
+.vote-item[aria-checked='true'] { border-color: var(--gold); background: rgba(229,185,92,.12); }
+.vote-item.mine { border-color: var(--gold); }
+.vote-thumb { width: 44px; height: 62px; border-radius: 6px; flex-shrink: 0; background: #333 center / cover no-repeat; }
+.vote-info { flex: 1; min-width: 0; }
+.vote-info strong { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vote-info span { font-size: 12px; color: var(--muted); }
+.vote-check {
+  width: 22px; height: 22px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); flex-shrink: 0;
+  display: grid; place-items: center; font-size: 13px; color: #2a1606;
+}
+.vote-item[aria-checked='true'] .vote-check, .vote-item.mine .vote-check { background: var(--gold); border-color: var(--gold); }
+.vote-submit { margin-top: 14px; width: 100%; }
+.vote-submit:disabled { opacity: .45; cursor: default; filter: grayscale(.3); }
+.vote-done { text-align: center; padding: 6px 0 2px; font-size: 14px; color: var(--gold-2); }
+body.player-open .vote-btn { visibility: hidden; }
+
 /* ---------- 팜플렛 근접 카드 ---------- */
 .near-card {
   position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
@@ -270,6 +299,7 @@ body.player-open .hint, body.player-open .name-tag3d { visibility: hidden; }
 
 @media (max-width: 600px) {
   .run-btn { bottom: calc(max(24px, env(safe-area-inset-bottom)) + 96px); right: 12px; padding: 12px; }
+  .vote-btn { bottom: calc(max(24px, env(safe-area-inset-bottom)) + 156px); }
   .run-btn .run-label { display: none; }
   .run-btn .run-icon { font-size: 22px; }
   .hud-top { padding: max(12px, env(safe-area-inset-top)) 12px 12px; }
