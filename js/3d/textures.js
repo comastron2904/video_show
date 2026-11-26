@@ -293,9 +293,59 @@ function wrapLines(ctx, text, maxWidth, maxLines) {
 }
 
 // 영화 포스터 (라이트박스에 들어갈 이미지)
-export function posterTexture(film, index, eventTitle) {
+// img(썸네일)가 있으면 썸네일을 꽉 채우고 아래에 제목을 얹고, 없으면 자동으로 포스터를 그립니다.
+const POSTER_SCALE = 1.5; // 600x900 기준 좌표로 그리고 1.5배 해상도로 저장
+
+function coverImage(ctx, img, w, h) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const sc = Math.max(w / iw, h / ih);
+  const dw = iw * sc, dh = ih * sc;
+  ctx.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+}
+
+function drawThumbnailPoster(ctx, w, h, film, index, eventTitle, img) {
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+  coverImage(ctx, img, w, h);
+  // 위·아래 그라데이션 (글자 가독성)
+  const top = ctx.createLinearGradient(0, 0, 0, 120);
+  top.addColorStop(0, 'rgba(0,0,0,0.55)'); top.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = top; ctx.fillRect(0, 0, w, 120);
+  const bot = ctx.createLinearGradient(0, h * 0.55, 0, h);
+  bot.addColorStop(0, 'rgba(0,0,0,0)'); bot.addColorStop(0.45, 'rgba(0,0,0,0.6)'); bot.addColorStop(1, 'rgba(0,0,0,0.88)');
+  ctx.fillStyle = bot; ctx.fillRect(0, h * 0.55, w, h * 0.45);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = `700 22px ${FONT}`;
+  ctx.fillText(`NO.${String(index + 1).padStart(2, '0')}  ·  WORLD PREMIERE`, w / 2, 52);
+
+  ctx.font = `800 62px ${FONT}`;
+  let size = 62;
+  let lines = wrapLines(ctx, film.title || '', w - 70, 2);
+  while (size > 38 && lines.some((l) => ctx.measureText(l).width > w - 70)) {
+    size -= 4; ctx.font = `800 ${size}px ${FONT}`; lines = wrapLines(ctx, film.title || '', w - 70, 2);
+  }
+  const lineH = size * 1.15;
+  let ty = h - 130 - (lines.length - 1) * lineH;
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 16;
+  ctx.fillStyle = '#fff';
+  for (const l of lines) { ctx.fillText(l, w / 2, ty); ty += lineH; }
+  ctx.shadowBlur = 0;
+  const meta = [film.director ? `감독 ${film.director}` : '', film.runtime || ''].filter(Boolean).join('   |   ');
+  if (meta) {
+    fitFont(ctx, meta, 600, 26, w - 70);
+    ctx.fillStyle = 'rgba(255,236,200,0.95)';
+    ctx.fillText(meta, w / 2, h - 72);
+  }
+  ctx.font = `700 15px ${FONT}`;
+  ctx.fillStyle = 'rgba(255,226,140,0.85)';
+  ctx.fillText('NOW SHOWING', w / 2, h - 34);
+}
+
+function drawGeneratedPoster(ctx, w, h, film, index, eventTitle) {
   const color = film.poster_color || '#c0392b';
-  return canvasTexture(600, 900, (ctx, w, h) => {
     const r = rand(1000 + index * 77);
     // 배경
     const g = ctx.createLinearGradient(0, 0, 0, h);
@@ -395,6 +445,42 @@ export function posterTexture(film, index, eventTitle) {
     ctx.fillText('NOW SHOWING', w / 2, h - 34);
 
     grain(ctx, w, h, 9000, r);
+  }
+
+function drawPoster(ctx, film, index, eventTitle, img) {
+  const w = 600, h = 900;
+  ctx.save();
+  ctx.setTransform(POSTER_SCALE, 0, 0, POSTER_SCALE, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  if (img) drawThumbnailPoster(ctx, w, h, film, index, eventTitle, img);
+  else drawGeneratedPoster(ctx, w, h, film, index, eventTitle);
+  ctx.restore();
+}
+
+export function posterTexture(film, index, eventTitle) {
+  return canvasTexture(600 * POSTER_SCALE, 900 * POSTER_SCALE, (ctx) => drawPoster(ctx, film, index, eventTitle, null));
+}
+
+// 썸네일 이미지를 불러와 포스터 텍스처를 다시 그림 (실패하면 기존 포스터 유지)
+export function applyThumbnail(texture, film, index, eventTitle) {
+  const url = String(film.thumbnail_url || '').trim();
+  if (!/^https?:\/\//i.test(url) && !url.startsWith('blob:')) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        drawPoster(texture.image.getContext('2d'), film, index, eventTitle, img);
+        texture.needsUpdate = true;
+        resolve(true);
+      } catch (e) {
+        console.warn('[premiere] 썸네일을 포스터에 그릴 수 없습니다 (이미지 서버가 CORS 를 허용하지 않음):', url);
+        drawPoster(texture.image.getContext('2d'), film, index, eventTitle, null);
+        resolve(false);
+      }
+    };
+    img.onerror = () => { console.warn('[premiere] 썸네일을 불러오지 못했습니다:', url); resolve(false); };
+    img.src = url;
   });
 }
 
