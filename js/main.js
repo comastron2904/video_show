@@ -49,7 +49,7 @@ function paintChip(look) {
       ctx.drawImage(img, 0, 0, 72, 72);
       ctx.restore();
     };
-    img.src = preview.snapshot(look.seed || 0);
+    preview.snapshot(look.seed || 0).then((url) => { if (url) img.src = url; });
     return;
   }
   ctx.save();
@@ -293,8 +293,17 @@ function renderVoteList() {
       <div class="vote-info"><strong>${escapeHtml(f.title)}</strong><span>${escapeHtml([f.director, f.runtime].filter(Boolean).join(' · '))}</span></div>
       <span class="vote-check">${vote.mine === f.id || vote.picked === f.id ? '✓' : ''}</span>`;
     const th = li.querySelector('.vote-thumb');
-    if (/^(https?:|blob:)/.test(f.thumbnail_url || '')) th.style.backgroundImage = `url("${encodeURI(f.thumbnail_url)}")`;
-    else th.style.background = f.poster_color || '#c0392b';
+    if (/^(https?:|blob:)/.test(f.thumbnail_url || '')) {
+      th.style.backgroundImage = `url("${encodeURI(f.thumbnail_url)}")`;
+      // 썸네일 비율(가로/세로)에 맞춰 목록 미리보기 모양도 자동으로
+      thumbRatio(f.thumbnail_url).then((ratio) => {
+        if (!ratio) return;
+        th.style.aspectRatio = String(ratio);
+        th.classList.toggle('landscape', ratio > 1);
+      });
+    } else {
+      th.style.background = f.poster_color || '#c0392b';
+    }
     if (locked) li.style.cursor = 'default';
     const pick = () => {
       if (vote.mine || vote.busy) return;
