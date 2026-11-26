@@ -25,7 +25,7 @@ export function createMaterials() {
     leafLight: new THREE.MeshStandardMaterial({ color: 0x4a9d62, roughness: 0.6, side: THREE.DoubleSide }),
     pot: new THREE.MeshStandardMaterial({ color: 0x1e1a1c, roughness: 0.3, metalness: 0.2 }),
     soil: new THREE.MeshStandardMaterial({ color: 0x2b1d14, roughness: 1 }),
-    bulb: new THREE.MeshStandardMaterial({ color: 0xfff1c9, emissive: 0xffd27a, emissiveIntensity: 3 }),
+    bulb: new THREE.MeshStandardMaterial({ color: 0xfff1c9, emissive: 0xffd27a, emissiveIntensity: 4 }),
     bulbDim: new THREE.MeshStandardMaterial({ color: 0xc9a979, emissive: 0xffb84a, emissiveIntensity: 0.6 }),
     popcorn: new THREE.MeshStandardMaterial({ color: 0xffe7a3, roughness: 0.8, emissive: 0x3a2a00, emissiveIntensity: 0.4 }),
     stripes: new THREE.MeshStandardMaterial({ map: stripeTexture(), roughness: 0.5 }),
