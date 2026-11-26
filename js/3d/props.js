@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
-  woodTexture, stripeTexture, signTexture, photoWallTexture, rugTexture, glowTexture, posterTexture,
+  woodTexture, stripeTexture, signTexture, photoWallTexture, rugTexture, glowTexture, posterTexture, applyThumbnail,
   starTileTexture, vintagePosterTexture, welcomeTexture, doorSignTexture, exitSignTexture,
 } from './textures.js';
 
@@ -47,72 +47,78 @@ export function buildStand(film, index, eventTitle, M, { withLight = true } = {}
   const g = new THREE.Group();
   const accent = new THREE.Color(film.poster_color || '#c0392b');
 
+  // 프레임 크기 (포스터 비율 2:3)
+  const fw = 1.66, fh = 2.4, fd = 0.12;
+  const lift = 0.32;
+
   // 받침
-  const base = mesh(new RoundedBoxGeometry(1.25, 0.08, 0.6, 3, 0.03), M.black);
-  base.position.y = 0.04;
+  const base = mesh(new RoundedBoxGeometry(1.85, 0.09, 0.72, 3, 0.035), M.black);
+  base.position.y = 0.045;
   g.add(base);
-  for (const sx of [-0.42, 0.42]) {
-    const leg = mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.22, 12), M.chrome);
-    leg.position.set(sx, 0.19, 0);
+  for (const sx of [-0.62, 0.62]) {
+    const leg = mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.24, 12), M.chrome);
+    leg.position.set(sx, 0.2, 0);
     g.add(leg);
   }
 
   // 프레임
-  const fw = 1.12, fh = 1.62, fd = 0.1;
-  const frame = mesh(new RoundedBoxGeometry(fw, fh, fd, 3, 0.02), M.gold);
-  frame.position.y = 0.3 + fh / 2;
+  const frame = mesh(new RoundedBoxGeometry(fw, fh, fd, 3, 0.025), M.gold);
+  frame.position.y = lift + fh / 2;
   g.add(frame);
-  const back = mesh(new THREE.BoxGeometry(fw - 0.06, fh - 0.06, fd + 0.002), M.black);
+  const back = mesh(new THREE.BoxGeometry(fw - 0.07, fh - 0.07, fd + 0.002), M.black);
   back.position.copy(frame.position);
   g.add(back);
 
   // 포스터 (라이트박스: 스스로 빛나는 면)
   const tex = posterTexture(film, index, eventTitle);
   const posterMat = new THREE.MeshStandardMaterial({
-    map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.55, roughness: 0.25,
+    map: tex, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.6, roughness: 0.3,
   });
-  const poster = mesh(new THREE.PlaneGeometry(fw - 0.12, fh - 0.12), posterMat, { cast: false });
+  const poster = mesh(new THREE.PlaneGeometry(fw - 0.14, fh - 0.14), posterMat, { cast: false });
   poster.position.set(0, frame.position.y, fd / 2 + 0.003);
   g.add(poster);
 
-  // 위쪽 작은 조명 바
-  const lampArm = mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.32, 8), M.brass);
+  // 위쪽 조명 바
+  const lampArm = mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 8), M.brass);
   lampArm.rotation.x = Math.PI / 2;
-  lampArm.position.set(0, 0.3 + fh + 0.04, 0.16);
+  lampArm.position.set(0, lift + fh + 0.05, 0.2);
   g.add(lampArm);
-  const lampHead = mesh(new THREE.CylinderGeometry(0.05, 0.07, 0.12, 16), M.brass);
-  lampHead.position.set(0, 0.3 + fh + 0.02, 0.32);
+  const lampHead = mesh(new THREE.CylinderGeometry(0.06, 0.085, 0.14, 16), M.brass);
+  lampHead.position.set(0, lift + fh + 0.03, 0.4);
   lampHead.rotation.x = -0.6;
   g.add(lampHead);
 
   // 바닥 빛웅덩이 + 상호작용 링
-  const glow = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 2.4), M.glow.clone());
+  const glow = new THREE.Mesh(new THREE.PlaneGeometry(3.0, 3.0), M.glow.clone());
   glow.rotation.x = -Math.PI / 2;
-  glow.position.set(0, 0.03, 0.75);
+  glow.position.set(0, 0.03, 0.95);
   glow.renderOrder = 2;
   g.add(glow);
 
   const ringMat = new THREE.MeshBasicMaterial({ color: 0xffe28a, transparent: true, opacity: 0, depthWrite: false });
-  const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.58, 48), ringMat);
+  const ring = new THREE.Mesh(new THREE.RingGeometry(0.58, 0.68, 48), ringMat);
   ring.rotation.x = -Math.PI / 2;
-  ring.position.set(0, 0.04, 0.95);
+  ring.position.set(0, 0.04, 1.2);
   g.add(ring);
 
   // 포인트 컬러 띠 (받침 앞)
-  const band = mesh(new THREE.BoxGeometry(1.1, 0.02, 0.01), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }), { cast: false });
-  band.position.set(0, 0.06, 0.305);
+  const band = mesh(new THREE.BoxGeometry(1.65, 0.022, 0.01), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }), { cast: false });
+  band.position.set(0, 0.068, 0.365);
   g.add(band);
 
   let spot = null;
   if (withLight) {
     spot = new THREE.SpotLight(0xffe2b0, 22, 0, 0.5, 0.65, 2);
-    spot.position.set(0, 3.4, 1.9);
-    spot.target.position.set(0, 1.0, 0);
+    spot.position.set(0, 4.2, 2.2);
+    spot.target.position.set(0, 1.4, 0);
     g.add(spot, spot.target);
   }
 
+  // 썸네일이 등록돼 있으면 불러와서 포스터를 교체
+  applyThumbnail(tex, film, index, eventTitle);
+
   const pickables = [frame, poster, back];
-  return { group: g, size: { w: 1.3, d: 0.65 }, poster: posterMat, ring: ringMat, glow: glow.material, spot, pickables };
+  return { group: g, size: { w: 1.9, d: 0.78 }, frontOffset: 1.2, poster: posterMat, ring: ringMat, glow: glow.material, spot, pickables };
 }
 
 // ---------------- 벨벳 차단봉 ----------------
