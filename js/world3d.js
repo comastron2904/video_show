@@ -14,13 +14,13 @@ import { bakeStatic, stripDecorLights } from './3d/bake.js';
 
 const POS_KEY = 'premiere.pos3d.v1';
 import {
-  marbleTexture, borderMarbleTexture, carpetTexture, wallpaperTexture, marqueeTexture, softShadowTexture, setMaxAnisotropy,
+  loadThumbnail, marbleTexture, borderMarbleTexture, carpetTexture, wallpaperTexture, marqueeTexture, softShadowTexture, setMaxAnisotropy,
 } from './3d/textures.js';
 
 const WALL_H = 4.2;
 const WALK_SPEED = 2.0;     // m/s
 const RUN_SPEED = 4.4;      // m/s (달리기)
-const NEAR_DIST = 1.5;      // 팜플렛 앞 지점과의 거리
+const NEAR_DIST = 2.2;      // 팜플렛 앞 지점과의 거리
 const P_RADIUS = 0.28;
 const CAM_AZ = 0.62;        // 카메라 방위각 (약 35°)
 const CAM_EL = 0.74;        // 카메라 고도각 (약 42°)
@@ -68,9 +68,10 @@ export async function createWorld(canvas, options) {
   const films = options.films || [];
   const isTouch = matchMedia('(pointer: coarse)').matches;
 
-  const [, charLib] = await Promise.all([
+  const [, charLib, thumbImgs] = await Promise.all([
     loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독 1관 2관 비상구 시사회에 오신 것을 환영합니다 팜플렛 앞에서 시청하기를 눌러 작품을 감상하세요 은막의 밤 자정의 필름 마지막 장면 별빛 극장 개봉 첫날 시네마 천국 황금시대 조명 카메라']),
     loadCharacterLibrary(),
+    Promise.all(films.map((f) => loadThumbnail(f.thumbnail_url))), // 썸네일 비율로 팜플렛 모양 결정
   ]);
   const makeAvatar = (look) => {
     const a = charLib ? instantiateCharacter(charLib, look.seed || 0) : createAvatar(look);
@@ -372,7 +373,7 @@ export async function createWorld(canvas, options) {
   // ---------------- 팜플렛 ----------------
   const stands = L.stands.map((s) => {
     const film = films[s.index];
-    const built = P.buildStand(film, s.index, options.title, M, { withLight: false });
+    const built = P.buildStand(film, s.index, options.title, M, { withLight: false, img: thumbImgs[s.index] });
     place(built, s.x, s.z, 0);
     built.pickables.forEach((m) => { m.userData.stand = s.index; });
     return { ...s, film, built, front: { x: s.x, z: s.z + (built.frontOffset || 0.95) }, glowT: 0 };
@@ -519,7 +520,7 @@ export async function createWorld(canvas, options) {
     if (!raycaster.ray.intersectPlane(floorPlane, hit)) return null;
     // 손가락은 정확하지 않으니 팜플렛 근처 바닥을 눌러도 팜플렛으로 인정
     for (const s of stands) {
-      if (Math.hypot(hit.x - s.front.x, hit.z - s.front.z) < 0.85 || (Math.abs(hit.x - s.x) < 1.1 && Math.abs(hit.z - s.z) < 0.7)) {
+      if (Math.hypot(hit.x - s.front.x, hit.z - s.front.z) < 1.3 || (Math.abs(hit.x - s.x) < 1.7 && Math.abs(hit.z - s.z) < 1.0)) {
         return { stand: s };
       }
     }
