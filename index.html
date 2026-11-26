@@ -33,6 +33,10 @@
     </button>
   </header>
 
+  <button id="voteBtn" class="run-btn vote-btn" type="button" hidden>
+    <span class="run-icon" aria-hidden="true">🗳️</span><span class="run-label">인기투표</span>
+  </button>
+
   <button id="runBtn" class="run-btn" type="button" aria-pressed="false" hidden>
     <span class="run-icon" aria-hidden="true">🏃</span><span class="run-label">달리기</span>
   </button>
@@ -68,6 +72,23 @@
           <button class="btn btn-gold" type="submit">입장하기</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- 인기투표 -->
+  <div id="vote" class="modal" hidden>
+    <div class="modal-card vote-card" role="dialog" aria-modal="true" aria-labelledby="voteTitle">
+      <div class="vote-head">
+        <div>
+          <p class="event-kicker">AUDIENCE AWARD</p>
+          <h2 id="voteTitle">인기투표</h2>
+          <p class="muted" id="voteSub">가장 마음에 든 작품 하나를 골라 주세요. 기기당 한 번만 투표할 수 있어요.</p>
+        </div>
+        <button id="closeVote" class="icon-btn" type="button" aria-label="닫기">✕</button>
+      </div>
+      <ul id="voteList" class="vote-list" role="radiogroup" aria-labelledby="voteTitle"></ul>
+      <div id="voteDone" class="vote-done" hidden></div>
+      <button id="submitVote" class="btn btn-gold vote-submit" type="button" disabled>작품을 선택해 주세요</button>
     </div>
   </div>
 
