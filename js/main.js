@@ -5,6 +5,7 @@ import { getDeviceId, getFingerprint } from './device.js';
 
 const $ = (id) => document.getElementById(id);
 
+
 async function loadData() {
   const sb = await getSupabase();
   if (!sb) return { films: DEMO_FILMS, settings: DEMO_SETTINGS, demo: true };
