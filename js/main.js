@@ -1,6 +1,7 @@
 import { getSupabase, DEMO_FILMS, DEMO_SETTINGS } from './supabase.js';
 import { generateLook, drawCharacter, loadProfile, saveProfile } from './character.js';
 import { drivePreviewUrl, driveViewUrl } from './drive.js';
+import { getDeviceId, getFingerprint } from './device.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -10,7 +11,7 @@ async function loadData() {
   const [filmsRes, settingsRes] = await Promise.all([
     sb.from('films').select('*')
       .eq('visible', true).order('sort_order').order('created_at'),
-    sb.from('site_settings').select('event_title,event_subtitle').eq('id', 1).maybeSingle(),
+    sb.from('site_settings').select('*').eq('id', 1).maybeSingle(),
   ]);
   const err = filmsRes.error || settingsRes.error;
   if (err) {
@@ -260,6 +261,132 @@ async function createBestWorld(opts) {
   return mod.createWorld($('world'), opts);
 }
 
+// ---- 인기투표 ----
+const VOTED_KEY = 'premiere.voted.v1';
+const vote = { films: [], demo: true, sb: null, deviceId: null, mine: null, picked: null, busy: false };
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function setVotedLocal(id) {
+  try { id ? localStorage.setItem(VOTED_KEY, id) : localStorage.removeItem(VOTED_KEY); } catch { /* 무시 */ }
+}
+
+function refreshVoteButton() {
+  const btn = $('voteBtn');
+  btn.classList.toggle('voted', !!vote.mine);
+  btn.querySelector('.run-label').textContent = vote.mine ? '투표 완료' : '인기투표';
+}
+
+function renderVoteList() {
+  const list = $('voteList');
+  list.replaceChildren();
+  const locked = !!vote.mine;
+  vote.films.forEach((f) => {
+    const li = document.createElement('li');
+    li.className = 'vote-item' + (vote.mine === f.id ? ' mine' : '');
+    li.setAttribute('role', 'radio');
+    li.setAttribute('aria-checked', String(vote.picked === f.id));
+    li.tabIndex = locked ? -1 : 0;
+    li.innerHTML = `<span class="vote-thumb"></span>
+      <div class="vote-info"><strong>${escapeHtml(f.title)}</strong><span>${escapeHtml([f.director, f.runtime].filter(Boolean).join(' · '))}</span></div>
+      <span class="vote-check">${vote.mine === f.id || vote.picked === f.id ? '✓' : ''}</span>`;
+    const th = li.querySelector('.vote-thumb');
+    if (/^(https?:|blob:)/.test(f.thumbnail_url || '')) th.style.backgroundImage = `url("${encodeURI(f.thumbnail_url)}")`;
+    else th.style.background = f.poster_color || '#c0392b';
+    if (locked) li.style.cursor = 'default';
+    const pick = () => {
+      if (vote.mine || vote.busy) return;
+      vote.picked = f.id;
+      renderVoteList();
+    };
+    li.addEventListener('click', pick);
+    li.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+    list.appendChild(li);
+  });
+
+  const submit = $('submitVote');
+  const done = $('voteDone');
+  if (vote.mine) {
+    const f = vote.films.find((x) => x.id === vote.mine);
+    done.textContent = f ? `‘${f.title}’에 투표하셨어요. 감사합니다! 🎉` : '이미 투표하셨어요. 감사합니다! 🎉';
+    done.hidden = false;
+    submit.hidden = true;
+  } else {
+    done.hidden = true;
+    submit.hidden = false;
+    const f = vote.films.find((x) => x.id === vote.picked);
+    submit.disabled = !f || vote.busy;
+    submit.textContent = vote.busy ? '투표하는 중…' : f ? `‘${f.title}’에 투표하기` : '작품을 선택해 주세요';
+  }
+}
+
+function openVote() {
+  world?.setPaused(true);
+  vote.picked = null;
+  renderVoteList();
+  $('vote').hidden = false;
+}
+function closeVote() {
+  $('vote').hidden = true;
+  world?.setPaused(false);
+}
+
+async function submitVote() {
+  const film = vote.films.find((x) => x.id === vote.picked);
+  if (!film || vote.mine || vote.busy) return;
+  if (!confirm(`‘${film.title}’에 투표할까요?\n투표는 기기당 한 번만 할 수 있고 바꿀 수 없어요.`)) return;
+  vote.busy = true;
+  renderVoteList();
+  let result = 'ok';
+  if (!vote.demo && vote.sb) {
+    const fp = await getFingerprint();
+    const { data, error } = await vote.sb.rpc('cast_vote', { p_film: film.id, p_device: vote.deviceId, p_fingerprint: fp });
+    if (error) { console.error('[premiere] 투표 실패', error); result = 'error'; } else result = data;
+  }
+  vote.busy = false;
+  if (result === 'ok') {
+    vote.mine = film.id;
+    setVotedLocal(film.id);
+  } else if (result === 'already') {
+    const { data } = await vote.sb.rpc('my_vote', { p_device: vote.deviceId });
+    vote.mine = data || film.id;
+    setVotedLocal(vote.mine);
+  } else {
+    renderVoteList();
+    const done = $('voteDone');
+    done.hidden = false;
+    done.textContent = result === 'closed' ? '투표가 마감되었어요.' : '투표를 저장하지 못했어요. 잠시 후 다시 시도해 주세요.';
+    return;
+  }
+  refreshVoteButton();
+  renderVoteList();
+}
+
+async function initVote(films, settings, demo) {
+  if (!films.length || settings.voting_open === false) return;
+  vote.films = films;
+  vote.demo = demo;
+  vote.deviceId = await getDeviceId();
+  try { vote.mine = localStorage.getItem(VOTED_KEY); } catch { vote.mine = null; }
+  if (!demo) {
+    vote.sb = await getSupabase();
+    if (vote.sb) {
+      const { data, error } = await vote.sb.rpc('my_vote', { p_device: vote.deviceId });
+      if (!error) { vote.mine = data || null; setVotedLocal(vote.mine); } // 서버 기록을 기준으로 (관리자가 초기화하면 다시 투표 가능)
+    }
+  }
+  const btn = $('voteBtn');
+  btn.hidden = false;
+  refreshVoteButton();
+  btn.addEventListener('click', openVote);
+  $('closeVote').addEventListener('click', closeVote);
+  $('submitVote').addEventListener('click', submitVote);
+  $('vote').addEventListener('click', (e) => { if (e.target === $('vote')) closeVote(); });
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('vote').hidden) closeVote(); });
+}
+
 async function main() {
   const isTouch = matchMedia('(pointer: coarse)').matches;
   document.body.classList.toggle('touch', isTouch);
@@ -325,6 +452,8 @@ async function main() {
     runBtn.querySelector('.run-label').textContent = on ? '달리는 중' : '달리기';
     world.setRunning?.(on);
   });
+
+  initVote(films, settings, demo).catch((e) => console.error('[premiere] 인기투표 준비 실패', e));
 
   $('watchBtn').addEventListener('click', () => openPlayer(currentFilm, demo));
   $('closePlayer').addEventListener('click', closePlayer);
