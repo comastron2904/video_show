@@ -283,13 +283,14 @@ function renderVoteList() {
   const list = $('voteList');
   list.replaceChildren();
   const locked = !!vote.mine;
-  vote.films.forEach((f) => {
+  vote.films.forEach((f, i) => {
     const li = document.createElement('li');
     li.className = 'vote-item' + (vote.mine === f.id ? ' mine' : '');
     li.setAttribute('role', 'radio');
     li.setAttribute('aria-checked', String(vote.picked === f.id));
     li.tabIndex = locked ? -1 : 0;
     li.innerHTML = `<span class="vote-thumb"></span>
+      <span class="vote-no">${i + 1}번</span>
       <div class="vote-info"><strong>${escapeHtml(f.title)}</strong><span>${escapeHtml([f.director, f.runtime].filter(Boolean).join(' · '))}</span></div>
       <span class="vote-check">${vote.mine === f.id || vote.picked === f.id ? '✓' : ''}</span>`;
     const th = li.querySelector('.vote-thumb');

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import {
   woodTexture, stripeTexture, signTexture, photoWallTexture, rugTexture, glowTexture, posterTexture, posterAspect,
-  starTileTexture, vintagePosterTexture, welcomeTexture, doorSignTexture, exitSignTexture,
+  starTileTexture, vintagePosterTexture, welcomeTexture, doorSignTexture, exitSignTexture, voteNumberTexture,
 } from './textures.js';
 
 export function createMaterials() {
@@ -104,6 +104,14 @@ export function buildStand(film, index, eventTitle, M, { withLight = true, scale
   ring.position.set(0, 0.04, 1.2);
   g.add(ring);
 
+  // 원 안의 인기투표 번호 (카메라 쪽에서 읽히도록 살짝 돌림)
+  const numberMat = new THREE.MeshBasicMaterial({ map: voteNumberTexture(index + 1), transparent: true, opacity: 0.3, depthWrite: false });
+  const numberDecal = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1), numberMat);
+  numberDecal.rotation.set(-Math.PI / 2, 0, 0.62);
+  numberDecal.position.set(0, 0.045, 1.2);
+  numberDecal.renderOrder = 3;
+  g.add(numberDecal);
+
   // 포인트 컬러 띠 (받침 앞)
   const band = mesh(new THREE.BoxGeometry(baseW - 0.2, 0.022, 0.01), new THREE.MeshStandardMaterial({ color: accent, emissive: accent, emissiveIntensity: 0.6 }), { cast: false });
   band.position.set(0, 0.068, 0.365);
@@ -121,7 +129,7 @@ export function buildStand(film, index, eventTitle, M, { withLight = true, scale
   g.scale.setScalar(scale);
 
   const pickables = [frame, poster, back];
-  return { group: g, size: { w: (baseW + 0.05) * scale, d: 0.78 * scale }, frontOffset: 1.2 * scale, poster: posterMat, ring: ringMat, glow: glow.material, spot, pickables };
+  return { group: g, size: { w: (baseW + 0.05) * scale, d: 0.78 * scale }, frontOffset: 1.2 * scale, poster: posterMat, ring: ringMat, number: numberMat, glow: glow.material, spot, pickables };
 }
 
 // ---------------- 벨벳 차단봉 ----------------

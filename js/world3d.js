@@ -70,7 +70,7 @@ export async function createWorld(canvas, options) {
 
   // 첫 화면을 빨리 띄우기 위해 꼭 필요한 것만 기다림 (썸네일·다른 캐릭터는 입장 후에 불러옴)
   const [, charLib] = await Promise.all([
-    loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '매표소 팝콘 감독 1관 2관 비상구 시사회에 오신 것을 환영합니다 팜플렛 앞에서 시청하기를 눌러 작품을 감상하세요 은막의 밤 자정의 필름 마지막 장면 별빛 극장 개봉 첫날 시네마 천국 황금시대 조명 카메라']),
+    loadFonts([options.title, ...films.map((f) => `${f.title} ${f.director} ${f.runtime}`), '인기투표 번 0123456789 매표소 팝콘 감독 1관 2관 비상구 시사회에 오신 것을 환영합니다 팜플렛 앞에서 시청하기를 눌러 작품을 감상하세요 은막의 밤 자정의 필름 마지막 장면 별빛 극장 개봉 첫날 시네마 천국 황금시대 조명 카메라']),
     loadCharacterLibrary(),
   ]);
   const makeAvatar = async (look) => {
@@ -713,6 +713,7 @@ export async function createWorld(canvas, options) {
       s.glowT += ((on ? 1 : 0) - s.glowT) * Math.min(1, dt * 6);
       const pulse = 0.75 + Math.sin(time * 4) * 0.25;
       s.built.ring.opacity = s.glowT * pulse * 0.9;
+      if (s.built.number) s.built.number.opacity = 0.3 + s.glowT * 0.7; // 평소엔 은은하게, 가까이 가면 또렷하게
       s.built.poster.emissiveIntensity = 0.55 + s.glowT * 0.35;
       s.built.glow.opacity = 0.3 + s.glowT * 0.35;
       if (s.built.spot) s.built.spot.intensity = 22 + s.glowT * 16;

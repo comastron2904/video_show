@@ -716,3 +716,20 @@ export function exitSignTexture() {
     ctx.fillText('EXIT 비상구', w / 2, h / 2 + 2);
   });
 }
+
+// 바닥 원 안에 표시할 인기투표 번호 (빨간 숫자만)
+export function voteNumberTexture(num) {
+  return canvasTexture(512, 512, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const text = String(num);
+    fitFont(ctx, text, 900, 300, w * 0.78);
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = 14;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.strokeText(text, w / 2, h / 2 + 10);
+    ctx.fillStyle = '#e0202e';
+    ctx.fillText(text, w / 2, h / 2 + 10);
+  });
+}
