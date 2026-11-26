@@ -86,3 +86,18 @@ input:focus, textarea:focus { border-color: var(--gold); }
   .film-item { grid-template-columns: 24px 8px 1fr; }
   .film-actions { grid-column: 1 / -1; justify-content: flex-start; }
 }
+
+.thumb-row { display: flex; gap: 14px; align-items: flex-start; }
+.thumb-preview {
+  width: 120px; aspect-ratio: 2 / 3; border-radius: 10px; flex-shrink: 0;
+  background: rgba(255,255,255,.05) center / cover no-repeat; border: 1px dashed rgba(255,255,255,.2);
+  display: grid; place-items: center; color: var(--muted); font-size: 12px; overflow: hidden;
+}
+.thumb-preview.has-img { border-style: solid; border-color: var(--line); }
+.thumb-preview.has-img span { display: none; }
+.thumb-controls { flex: 1; display: grid; gap: 8px; align-content: start; }
+.file-btn { justify-self: start; cursor: pointer; }
+.muted.small { font-size: 12px; }
+.film-thumb { width: 34px; height: 51px; border-radius: 5px; background: rgba(255,255,255,.06) center / cover no-repeat; }
+.film-item { grid-template-columns: 34px 34px 1fr auto; }
+@media (max-width: 640px) { .film-item { grid-template-columns: 24px 34px 1fr; } .thumb-row { flex-direction: column; } }
