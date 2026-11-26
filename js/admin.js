@@ -9,6 +9,8 @@ let demo = false;
 let films = [];
 let editing = null;   // 편집 중인 film (null 이면 새로 추가)
 let pickedColor = COLORS[0];
+let thumbFile = null;   // 새로 고른 이미지 파일
+let thumbUrl = '';      // 현재 썸네일 주소
 
 // ---------- 공통 ----------
 function toast(msg, bad = false) {
@@ -122,7 +124,7 @@ function renderFilms() {
     li.className = 'film-item' + (film.visible === false ? ' hidden-film' : '');
     li.innerHTML = `
       <span class="film-no">${String(i + 1).padStart(2, '0')}</span>
-      <span class="film-swatch"></span>
+      <span class="film-thumb"></span>
       <div class="film-info">
         <strong></strong>
         <span class="meta"></span>${film.visible === false ? '<span class="tag">비공개</span>' : ''}
@@ -133,7 +135,9 @@ function renderFilms() {
         <button class="btn btn-ghost btn-sm" data-act="edit">수정</button>
         <button class="btn btn-danger btn-sm" data-act="delete">삭제</button>
       </div>`;
-    li.querySelector('.film-swatch').style.background = film.poster_color;
+    const thumbEl = li.querySelector('.film-thumb');
+    if (/^(https?:|blob:)/.test(film.thumbnail_url || '')) thumbEl.style.backgroundImage = `url("${encodeURI(film.thumbnail_url)}")`;
+    else thumbEl.style.background = film.poster_color;
     li.querySelector('strong').textContent = film.title;
     li.querySelector('.meta').textContent = [film.director, film.runtime].filter(Boolean).join(' · ') || '정보 없음';
     li.querySelector('.film-actions').addEventListener('click', (e) => {
@@ -169,6 +173,94 @@ async function remove(film) {
   films = films.filter((f) => f.id !== film.id);
   renderFilms();
   toast('삭제했어요.');
+}
+
+
+// ---------- 썸네일 ----------
+function normalizeImageUrl(raw) {
+  const u = String(raw || '').trim();
+  if (!u) return '';
+  // 구글 드라이브 이미지 공유 링크 → 이미지 주소
+  if (/drive\.google\.com|docs\.google\.com/.test(u)) {
+    const id = extractDriveId(u);
+    if (id) return `https://drive.google.com/thumbnail?id=${id}&sz=w1200`;
+  }
+  return /^https:\/\//i.test(u) ? u : '';
+}
+
+function showThumbPreview(url) {
+  const el = $('thumbPreview');
+  if (url) {
+    el.style.backgroundImage = `url("${encodeURI(url)}")`;
+    el.classList.add('has-img');
+  } else {
+    el.style.backgroundImage = '';
+    el.classList.remove('has-img');
+  }
+}
+
+let previewObjectUrl = null;
+$('fThumbFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('이미지 파일만 올릴 수 있어요.', true); return; }
+  thumbFile = file;
+  $('fThumbUrl').value = '';
+  if (previewObjectUrl) URL.revokeObjectURL(previewObjectUrl);
+  previewObjectUrl = URL.createObjectURL(file);
+  showThumbPreview(previewObjectUrl);
+  $('thumbNote').textContent = `${file.name} · 저장하면 업로드됩니다.`;
+});
+$('fThumbUrl').addEventListener('input', () => {
+  thumbFile = null;
+  $('fThumbFile').value = '';
+  const url = normalizeImageUrl($('fThumbUrl').value);
+  showThumbPreview(url);
+  $('thumbNote').textContent = $('fThumbUrl').value.trim() && !url
+    ? 'https:// 로 시작하는 이미지 주소를 넣어 주세요.'
+    : '외부 주소는 사이트에서 불러오지 못할 수 있어요. 파일 업로드를 권장합니다.';
+});
+$('thumbClear').addEventListener('click', () => {
+  thumbFile = null; thumbUrl = '';
+  $('fThumbFile').value = ''; $('fThumbUrl').value = '';
+  showThumbPreview('');
+  $('thumbNote').textContent = '썸네일 없이 자동 포스터로 표시됩니다.';
+});
+
+// 큰 사진은 가로 1000px 로 줄여서 JPG 로 변환
+function resizeImage(file, maxW = 1000) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, maxW / img.naturalWidth);
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * scale);
+      c.height = Math.round(img.naturalHeight * scale);
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, c.width, c.height);
+      ctx.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error('변환 실패'))), 'image/jpeg', 0.88);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽을 수 없음')); };
+    img.src = url;
+  });
+}
+
+async function resolveThumbnail() {
+  if (thumbFile) {
+    if (demo) return URL.createObjectURL(thumbFile);
+    const blob = await resizeImage(thumbFile);
+    const path = `films/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+    const { error } = await sb.storage.from('posters').upload(path, blob, { contentType: 'image/jpeg', upsert: false, cacheControl: '31536000' });
+    if (error) throw Object.assign(new Error(error.message), { upload: true });
+    return sb.storage.from('posters').getPublicUrl(path).data.publicUrl;
+  }
+  const typed = $('fThumbUrl').value.trim();
+  if (typed) return normalizeImageUrl(typed);
+  return thumbUrl;
 }
 
 // ---------- 편집기 ----------
@@ -219,6 +311,12 @@ function openEditor(film) {
   $('fUrl').value = film?.drive_url || '';
   $('fVisible').checked = film ? film.visible !== false : true;
   pickedColor = film?.poster_color || COLORS[films.length % COLORS.length];
+  thumbFile = null;
+  thumbUrl = film?.thumbnail_url || '';
+  $('fThumbFile').value = '';
+  $('fThumbUrl').value = '';
+  showThumbPreview(thumbUrl);
+  $('thumbNote').textContent = '파일은 저장할 때 자동으로 줄여서 올라갑니다.';
   renderSwatches();
   updateUrlStatus();
   $('previewWrap').hidden = true;
@@ -267,6 +365,14 @@ $('filmForm').addEventListener('submit', async (e) => {
   };
   if (!payload.title) { $('fTitle').focus(); return; }
 
+  try {
+    payload.thumbnail_url = await resolveThumbnail();
+  } catch (err) {
+    console.error(err);
+    toast(err.upload ? '썸네일 업로드에 실패했어요. supabase/schema.sql 을 다시 실행했는지 확인하세요.' : '썸네일 이미지를 처리하지 못했어요.', true);
+    return;
+  }
+
   if (demo) {
     if (editing) Object.assign(editing, payload);
     else films.push({ id: `local-${Date.now()}`, sort_order: films.length, ...payload });
@@ -281,7 +387,12 @@ $('filmForm').addEventListener('submit', async (e) => {
     const maxOrder = films.reduce((m, f) => Math.max(m, f.sort_order ?? 0), -1);
     res = await sb.from('films').insert({ ...payload, sort_order: maxOrder + 1 });
   }
-  if (res.error) { console.error(res.error); toast('저장에 실패했어요. 관리자 권한을 확인하세요.', true); return; }
+  if (res.error) {
+    console.error(res.error);
+    const noColumn = /thumbnail_url/.test(res.error.message || '');
+    toast(noColumn ? '썸네일 칸이 없어요. supabase/schema.sql 을 다시 실행하세요.' : '저장에 실패했어요. 관리자 권한을 확인하세요.', true);
+    return;
+  }
   closeEditor();
   toast(editing ? '수정했어요.' : '상영작을 추가했어요.');
   loadAll();
