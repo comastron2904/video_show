@@ -128,8 +128,10 @@ async function toggleFullscreen() {
   } catch { /* 무시 */ }
 }
 
-// 구글 드라이브 플레이어는 높이가 낮으면 버튼이 잘려서, 최소 높이를 확보한 뒤 화면에 맞게 축소
-const PLAYER_MIN_H = 480;
+// 구글 드라이브 플레이어는 휴대폰에서 버튼을 크게 그려서 좁거나 낮은 칸에서는 잘립니다.
+// 그래서 최소 640×420 크기로 그린 뒤 화면에 맞게 통째로 축소합니다.
+const PLAYER_MIN_W = 640;
+const PLAYER_MIN_H = 420;
 let fitObserver = null;
 function fitIframe() {
   const frame = $('playerFrame');
@@ -137,7 +139,7 @@ function fitIframe() {
   if (!iframe) return;
   const w = frame.clientWidth, h = frame.clientHeight;
   if (!w || !h) return;
-  const s = Math.min(1, h / PLAYER_MIN_H);
+  const s = Math.min(1, w / PLAYER_MIN_W, h / PLAYER_MIN_H);
   iframe.style.width = `${w / s}px`;
   iframe.style.height = `${h / s}px`;
   iframe.style.transform = s < 1 ? `scale(${s})` : '';
