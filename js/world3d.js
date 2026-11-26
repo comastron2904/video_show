@@ -20,7 +20,7 @@ import {
 const WALL_H = 4.2;
 const WALK_SPEED = 2.0;     // m/s
 const RUN_SPEED = 4.4;      // m/s (달리기)
-const NEAR_DIST = 1.35;     // 팜플렛 앞 지점과의 거리
+const NEAR_DIST = 1.5;      // 팜플렛 앞 지점과의 거리
 const P_RADIUS = 0.28;
 const CAM_AZ = 0.62;        // 카메라 방위각 (약 35°)
 const CAM_EL = 0.74;        // 카메라 고도각 (약 42°)
@@ -375,7 +375,7 @@ export async function createWorld(canvas, options) {
     const built = P.buildStand(film, s.index, options.title, M, { withLight: false });
     place(built, s.x, s.z, 0);
     built.pickables.forEach((m) => { m.userData.stand = s.index; });
-    return { ...s, film, built, front: { x: s.x, z: s.z + 0.95 }, glowT: 0 };
+    return { ...s, film, built, front: { x: s.x, z: s.z + (built.frontOffset || 0.95) }, glowT: 0 };
   });
   const pickables = stands.flatMap((s) => s.built.pickables);
 
@@ -519,7 +519,7 @@ export async function createWorld(canvas, options) {
     if (!raycaster.ray.intersectPlane(floorPlane, hit)) return null;
     // 손가락은 정확하지 않으니 팜플렛 근처 바닥을 눌러도 팜플렛으로 인정
     for (const s of stands) {
-      if (Math.hypot(hit.x - s.front.x, hit.z - s.front.z) < 0.75 || (Math.abs(hit.x - s.x) < 0.9 && Math.abs(hit.z - s.z) < 0.6)) {
+      if (Math.hypot(hit.x - s.front.x, hit.z - s.front.z) < 0.85 || (Math.abs(hit.x - s.x) < 1.1 && Math.abs(hit.z - s.z) < 0.7)) {
         return { stand: s };
       }
     }
