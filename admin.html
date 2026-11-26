@@ -49,6 +49,20 @@
 
     <section class="panel">
       <div class="panel-head">
+        <h2>인기투표 결과 <span id="voteTotal" class="count"></span></h2>
+        <div class="vote-admin-actions">
+          <label class="check toggle"><input id="votingOpen" type="checkbox" checked /> 투표 받기</label>
+          <button id="refreshVotes" class="btn btn-ghost btn-sm" type="button">새로고침</button>
+          <button id="resetVotes" class="btn btn-danger btn-sm" type="button">투표 초기화</button>
+        </div>
+      </div>
+      <ol id="voteResults" class="vote-results"></ol>
+      <p id="voteEmpty" class="muted empty" hidden>아직 투표가 없어요.</p>
+      <p id="voteNote" class="muted small vote-note" hidden></p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
         <h2>상영작 <span id="filmCount" class="count"></span></h2>
         <button id="newFilmBtn" class="btn btn-gold btn-sm" type="button">+ 상영작 추가</button>
       </div>
