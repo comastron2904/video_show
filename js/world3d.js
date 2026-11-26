@@ -85,7 +85,7 @@ export async function createWorld(canvas, options) {
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 0.9;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   setMaxAnisotropy(renderer.capabilities.getMaxAnisotropy());
 
@@ -95,7 +95,7 @@ export async function createWorld(canvas, options) {
 
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-  scene.environmentIntensity = 0.5;
+  scene.environmentIntensity = 0.3;
   pmrem.dispose();
 
   const M = P.createMaterials();
@@ -117,11 +117,11 @@ export async function createWorld(canvas, options) {
   }
 
   // ---------------- 조명 ----------------
-  const hemi = new THREE.HemisphereLight(0xffe6cc, 0x2a1530, 0.95);
+  const hemi = new THREE.HemisphereLight(0xffe6cc, 0x2a1530, 0.6);
   scene.add(hemi);
 
   const center = new THREE.Vector3(W / 2, 0, D / 2);
-  const key = new THREE.DirectionalLight(0xffdcb8, 2.1);
+  const key = new THREE.DirectionalLight(0xffdcb8, 1.5);
   key.position.set(center.x - 7, 15, center.z + 9);
   key.target.position.copy(center);
   key.castShadow = true;
@@ -156,7 +156,7 @@ export async function createWorld(canvas, options) {
   const marble = marbleTexture();
   marble.wrapS = marble.wrapT = THREE.RepeatWrapping;
   marble.repeat.set(W / 3, D / 3); // 타일 한 장 = 1.5m
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: marble, roughness: 0.32, metalness: 0 }));
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(W, D), new THREE.MeshStandardMaterial({ map: marble, color: 0xb9ab98, roughness: 0.32, metalness: 0 }));
   floor.rotation.x = -Math.PI / 2;
   floor.position.set(W / 2, 0, D / 2);
   floor.receiveShadow = true;
@@ -425,7 +425,7 @@ export async function createWorld(canvas, options) {
   const msaa = renderer.capabilities.isWebGL2 !== false && !isTouch ? 4 : 0;
   const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: msaa }));
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.4, 0.45, 1.0);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.35, 0.4, 1.8);
   composer.addPass(bloom);
   if (isTouch) bloom.enabled = false; // 모바일은 빛 번짐 효과 끔 (성능)
   composer.addPass(new OutputPass());
@@ -695,8 +695,8 @@ export async function createWorld(canvas, options) {
 
     // 마키 전구 점멸
     const phase = Math.floor(time * 2.5) % 2;
-    marquee.bulbsA.emissiveIntensity = phase ? 3.2 : 0.6;
-    marquee.bulbsB.emissiveIntensity = phase ? 0.6 : 3.2;
+    marquee.bulbsA.emissiveIntensity = phase ? 4.2 : 0.8;
+    marquee.bulbsB.emissiveIntensity = phase ? 0.8 : 4.2;
 
     // 캐릭터
     avatar.root.position.set(player.x, 0, player.z);
