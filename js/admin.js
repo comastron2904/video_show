@@ -88,6 +88,8 @@ async function loadAll() {
   if (demo) {
     renderSettings(loadAll._settings || (loadAll._settings = { ...DEMO_SETTINGS }));
     renderFilms();
+    if (!demoVotes.length && films.length) demoVotes = films.flatMap((f, i) => Array.from({ length: (films.length - i) * 2 + (i % 2) }, () => ({ film_id: f.id, fingerprint: i === 0 ? 'same' : `fp${Math.random()}` })));
+    loadVotes();
     return;
   }
   const [s, f] = await Promise.all([
@@ -98,9 +100,11 @@ async function loadAll() {
   renderSettings(s.data || DEMO_SETTINGS);
   films = f.data || [];
   renderFilms();
+  loadVotes();
 }
 
 function renderSettings(s) {
+  $('votingOpen').checked = s.voting_open !== false;
   $('setTitle').value = s.event_title || '';
   $('setSubtitle').value = s.event_subtitle || '';
 }
@@ -272,6 +276,80 @@ async function resolveThumbnail() {
   if (typed) return normalizeImageUrl(typed);
   return thumbUrl;
 }
+
+
+// ---------- 인기투표 결과 ----------
+let demoVotes = [];
+async function loadVotes() {
+  let votes = [];
+  if (demo) {
+    votes = demoVotes;
+  } else {
+    const { data, error } = await sb.from('votes').select('film_id,fingerprint,created_at');
+    if (error) {
+      console.error(error);
+      $('voteNote').hidden = false;
+      $('voteNote').textContent = /votes/.test(error.message || '') ? '투표 테이블이 없어요. supabase/schema.sql 을 다시 실행하세요.' : '투표 결과를 불러오지 못했어요.';
+      return;
+    }
+    votes = data || [];
+  }
+  renderVotes(votes);
+}
+
+function renderVotes(votes) {
+  const counts = new Map();
+  for (const v of votes) counts.set(v.film_id, (counts.get(v.film_id) || 0) + 1);
+  const total = votes.length;
+  const rows = films
+    .map((f) => ({ film: f, n: counts.get(f.id) || 0 }))
+    .sort((a, b) => b.n - a.n || (a.film.sort_order ?? 0) - (b.film.sort_order ?? 0));
+  const max = Math.max(1, ...rows.map((r) => r.n));
+  $('voteTotal').textContent = total ? `총 ${total}표` : '';
+  $('voteEmpty').hidden = total > 0;
+  const list = $('voteResults');
+  list.replaceChildren();
+  if (!total) return;
+  let rank = 0, prev = -1;
+  rows.forEach((r, i) => {
+    if (r.n !== prev) { rank = i + 1; prev = r.n; }
+    const li = document.createElement('li');
+    li.className = 'vote-row';
+    li.innerHTML = `<span class="vote-rank">${r.n ? rank : '-'}</span><span class="film-thumb"></span>
+      <div class="vote-bar-wrap"><strong></strong><div class="vote-bar"><span></span></div></div>
+      <span class="vote-count">${r.n}표<small>${total ? Math.round((r.n / total) * 100) : 0}%</small></span>`;
+    li.querySelector('strong').textContent = r.film.title;
+    li.querySelector('.vote-bar span').style.width = `${(r.n / max) * 100}%`;
+    const th = li.querySelector('.film-thumb');
+    if (/^(https?:|blob:)/.test(r.film.thumbnail_url || '')) th.style.backgroundImage = `url("${encodeURI(r.film.thumbnail_url)}")`;
+    else th.style.background = r.film.poster_color;
+    list.appendChild(li);
+  });
+  // 같은 기기 정보(지문)로 들어온 표 안내 (같은 기종일 수도 있음)
+  const fp = new Map();
+  for (const v of votes) if (v.fingerprint) fp.set(v.fingerprint, (fp.get(v.fingerprint) || 0) + 1);
+  const dup = [...fp.values()].filter((n) => n > 1).reduce((a, n) => a + n, 0);
+  const note = $('voteNote');
+  note.hidden = !dup;
+  note.textContent = dup ? `참고: 기기 정보가 같은 표가 ${dup}표 있어요. 같은 기종·같은 브라우저를 쓰는 다른 사람일 수도 있습니다.` : '';
+}
+
+$('refreshVotes').addEventListener('click', loadVotes);
+$('resetVotes').addEventListener('click', async () => {
+  if (!confirm('모든 투표를 지울까요? 되돌릴 수 없고, 모든 기기가 다시 투표할 수 있게 됩니다.')) return;
+  if (demo) { demoVotes = []; loadVotes(); toast('투표를 초기화했어요.'); return; }
+  const { error } = await sb.from('votes').delete().gt('id', 0);
+  if (error) { toast('초기화에 실패했어요.', true); return; }
+  toast('투표를 초기화했어요.');
+  loadVotes();
+});
+$('votingOpen').addEventListener('change', async (e) => {
+  const open = e.target.checked;
+  if (demo) { toast(open ? '투표를 받습니다 (데모)' : '투표를 마감했어요 (데모)'); return; }
+  const { error } = await sb.from('site_settings').update({ voting_open: open }).eq('id', 1);
+  if (error) { e.target.checked = !open; toast('변경하지 못했어요. supabase/schema.sql 을 다시 실행했는지 확인하세요.', true); return; }
+  toast(open ? '투표를 다시 받습니다.' : '투표를 마감했어요. 관객 화면에서 투표 버튼이 사라집니다.');
+});
 
 // ---------- 편집기 ----------
 function renderSwatches() {
